@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lapisan Bumi Interaktif - WebGL</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #ui-container {
+            position: absolute; top: 10px; left: 10px;
+            display: flex; flex-direction: column; gap: 10px; z-index: 100;
+        }
+        #ui-container button {
+            padding: 10px 15px; font-size: 14px;
+            background-color: rgba(0, 0, 0, 0.7); color: white;
+            border: none; border-radius: 5px; cursor: pointer;
+        }
+        #ui-container button:hover {
+            background-color: rgba(255, 255, 255, 0.9); color: black;
+        }
+        #info-label {
+            position: absolute; display: none;
+            background-color: rgba(0, 0, 0, 0.8); color: white;
+            padding: 8px 12px; border-radius: 5px; z-index: 101;
+            pointer-events: none; font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui-container">
+        <button id="toggle-transparency">Toggle Transparansi</button>
+        <button id="toggle-clipping">Toggle Irisan</button>
+    </div>
+    <div id="info-label">Nama Lapisan</div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let isTransparent = true;
+        let isClipped = false;
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const mouseScreen = { x: 0, y: 0 };
+        let infoLabel;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 10;
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffffff, 1.5);
+        pointLight.position.set(10, 10, 10);
+        scene.add(pointLight);
+
+        const clipPlanes = [
+            new THREE.Plane(new THREE.Vector3(1, 0, 0), 0),
+            new THREE.Plane(new THREE.Vector3(0, -1, 0), 0)
+        ];
+        renderer.localClippingEnabled = false;
+
+        function createLayerMaterial(color, initialOpacity = 1.0) {
+            return new THREE.MeshStandardMaterial({
+                color: color,
+                transparent: initialOpacity < 1.0,
+                opacity: initialOpacity,
+                clippingPlanes: clipPlanes,
+                clipIntersection: false,
+                side: THREE.DoubleSide,
+            });
+        }
+
+        // --- (PERUBAHAN DIMULAI DI SINI) ---
+
+        // 1. Buat TextureLoader untuk memuat gambar PNG
+        const textureLoader = new THREE.TextureLoader();
+        
+        // 2. Muat gambar PNG Anda (pastikan namanya "peta_kerak.png")
+        //    File ini HARUS ada di folder yang sama dengan file index.html
+        const crustTexture = textureLoader.load('peta_kerak.png');
+        
+        // --- MEMBUAT LAPISAN BUMI ---
+        
+        // Geometri (ukuran)
+        const innerCoreGeo = new THREE.SphereGeometry(1.5, 32, 32);
+        const outerCoreGeo = new THREE.SphereGeometry(2.5, 32, 32);
+        const mantleGeo = new THREE.SphereGeometry(3.5, 32, 32);
+        const crustGeo = new THREE.SphereGeometry(3.7, 32, 32); // Geometri kerak
+
+        // Material (Lapisan Dalam)
+        const innerCoreMat = createLayerMaterial(0xffff00); // Kuning
+        const outerCoreMat = createLayerMaterial(0xff0000); // Merah
+        const mantleMat = createLayerMaterial(0xffa500, 0.6); // Oranye (transparan)
+
+        // 3. Material Kerak Bumi (KHUSUS) - Menggunakan Tekstur
+        const crustMat = new THREE.MeshStandardMaterial({
+            map: crustTexture,         // Terapkan tekstur PNG (daratan)
+            color: 0x0066ff,         // Warna dasar (lautan), akan terlihat di area transparan PNG
+            transparent: true,         // Wajib agar opacity dan transparansi PNG berfungsi
+            opacity: isTransparent ? 0.7 : 1.0, // Ambil dari status awal
+            clippingPlanes: clipPlanes,
+            clipIntersection: false,
+            side: THREE.DoubleSide,
+        });
+
+        // --- (PERUBAHAN SELESAI DI SINI) ---
+
+        // Mesh (menggabungkan geometri + material)
+        const innerCore = new THREE.Mesh(innerCoreGeo, innerCoreMat);
+        innerCore.userData = { name: 'Inner Core (Inti Dalam)' };
+        scene.add(innerCore);
+
+        const outerCore = new THREE.Mesh(outerCoreGeo, outerCoreMat);
+        outerCore.userData = { name: 'Outer Core (Inti Luar)' };
+        scene.add(outerCore);
+
+        const mantle = new THREE.Mesh(mantleGeo, mantleMat);
+        mantle.userData = { name: 'Mantle (Mantel)' };
+        scene.add(mantle);
+
+        const crust = new THREE.Mesh(crustGeo, crustMat); // Mesh kerak
+        crust.userData = { name: 'Crust (Kerak Bumi)' };
+        scene.add(crust);
+
+        const hoverableObjects = [crust, mantle, outerCore, innerCore];
+
+        // --- EVENT LISTENERS (Tidak ada perubahan di sini) ---
+        infoLabel = document.getElementById('info-label');
+        const toggleTransparencyBtn = document.getElementById('toggle-transparency');
+        const toggleClippingBtn = document.getElementById('toggle-clipping');
+
+        toggleTransparencyBtn.addEventListener('click', () => {
+            isTransparent = !isTransparent;
+            
+            mantleMat.transparent = isTransparent;
+            crustMat.transparent = isTransparent; // Pastikan ini juga di-toggle
+
+            mantleMat.opacity = isTransparent ? 0.6 : 1.0;
+            crustMat.opacity = isTransparent ? 0.7 : 1.0; // Ini akan tetap bekerja
+
+            toggleTransparencyBtn.textContent = isTransparent ? 'Buat Solid' : 'Buat Transparan';
+        });
+
+        toggleClippingBtn.addEventListener('click', () => {
+            isClipped = !isClipped;
+            renderer.localClippingEnabled = isClipped;
+            toggleClippingBtn.textContent = isClipped ? 'Tampilkan Penuh' : 'Tampilkan Irisan';
+        });
+
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+            mouseScreen.x = event.clientX;
+            mouseScreen.y = event.clientY;
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function checkHover() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(hoverableObjects);
+
+            if (intersects.length > 0) {
+                // Objek yang kena paling depan adalah lapisan terluar (Kerak)
+                // Jika kita dalam mode solid, kita tidak bisa hover ke dalam
+                // Jika dalam mode transparan, kita bisa hover tembus
+                
+                let intersectedObject = intersects[0].object;
+
+                // Logika agar bisa hover tembus saat transparan
+                if (isTransparent && intersects.length > 1) {
+                    // Jika objek pertama adalah kerak (transparan), 
+                    // cek apakah ada objek kedua di belakangnya (mantel, dst)
+                    if (intersectedObject === crust) {
+                        intersectedObject = intersects[1].object;
+                    }
+                }
+                
+                const objectName = intersectedObject.userData.name;
+                infoLabel.style.display = 'block';
+                infoLabel.textContent = objectName;
+                infoLabel.style.left = (mouseScreen.x + 10) + 'px';
+                infoLabel.style.top = (mouseScreen.y + 10) + 'px';
+
+            } else {
+                infoLabel.style.display = 'none';
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            innerCore.rotation.y += 0.005;
+            outerCore.rotation.y += 0.004;
+            mantle.rotation.y += 0.003;
+            crust.rotation.y += 0.002;
+            
+            // Cek hover hanya jika mouse bergerak
+            checkHover();
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
