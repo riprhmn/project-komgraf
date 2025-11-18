@@ -35,9 +35,13 @@
             background: rgba(0, 0, 0, 0.3);
             padding: 10px 20px;
             border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.1 );
         }
 
+
+
+
+        
         #ui-container {
             position: absolute; 
             top: 20px; left: 20px;
@@ -294,13 +298,36 @@
             isClipped ? "Tampilkan Penuh" : "Toggle Irisan";
     };
 
+    // === LOGIKA ZOOM TOMBOL
+    
     const zoomStep = 1.5;
+
+    // Fungsi helper untuk melakukan zoom yang aman terhadap rotasi
+    function updateZoom(isZoomIn) {
+        // 1. Hitung jarak saat ini dari kamera ke titik tengah (0,0,0)
+        const currentDist = camera.position.distanceTo(controls.target);
+        let newDist;
+
+        // 2. Tentukan jarak baru berdasarkan batas min/max controls
+        if (isZoomIn) {
+            newDist = Math.max(currentDist - zoomStep, controls.minDistance);
+        } else {
+            newDist = Math.min(currentDist + zoomStep, controls.maxDistance);
+        }
+
+        // 3. Ubah panjang vektor posisi kamera (mendekat/menjauh) tanpa mengubah sudut pandang
+        camera.position.setLength(newDist);
+        
+        // 4. Update controls agar sinkron dengan posisi baru
+        controls.update(); 
+    }
+
     document.getElementById("zoom-in").onclick = () => {
-        camera.position.z = Math.max(camera.position.z - zoomStep, controls.minDistance);
+        updateZoom(true);
     };
 
     document.getElementById("zoom-out").onclick = () => {
-        camera.position.z = Math.min(camera.position.z + zoomStep, controls.maxDistance);
+        updateZoom(false);
     };
 
 
@@ -324,12 +351,38 @@
         raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObjects(layers);
 
-        if (intersects.length > 0) {
-             const obj = intersects[0].object;
-             const title = obj.userData.name;
+        //PERBAIKAN LOGIKA KLIK
+        let foundObj = null;
+
+        // Loop semua objek yang tertembak sinar (dari depan ke belakang)
+        for (let i = 0; i < intersects.length; i++) {
+            const hit = intersects[i];
+            const obj = hit.object;
+
+            // Jika mode irisan (clipping) aktif, kita harus cek apakah titik ini visible?
+            if (isClipped) {
+                let isVisible = true;
+                for (const plane of clipPlanes) {
+                    // Jika jarak titik ke bidang negatif, berarti titik itu ada di area yang terpotong
+                    if (plane.distanceToPoint(hit.point) < 0) {
+                        isVisible = false;
+                        break;
+                    }
+                }
+                // Jika tidak visible, lewati (skip) layer ini dan cek layer di belakangnya
+                if (!isVisible) continue;
+            }
+
+            // Jika sampai sini, berarti objek ini adalah yang visualnya terlihat user
+            foundObj = obj;
+            break; // Stop loop, kita sudah dapat objek terdepan
+        }
+        // -----------------------------
+
+        if (foundObj) {
+             const title = foundObj.userData.name;
              const desc = layerDescriptions[title] || "Tidak ada deskripsi.";
             
-            // description-box ditampilkan
              descriptionBox.style.display = "block"; 
              document.getElementById("desc-title").textContent = title;
              document.getElementById("desc-text").textContent = desc;
