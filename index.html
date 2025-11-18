@@ -94,8 +94,45 @@
             z-index: 101;
             border: 1px solid rgba(255,255,255,0.2);
         }
+        #description-box {
+            position: absolute;
+            right: 20px;
+            top: 100px;
+            width: 260px;
+            padding: 15px;
+            color: white;
+
+            background: rgba(0,0,0,0.65);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 10px;
+            backdrop-filter: blur(6px);
+
+            display: none;
+            z-index: 130;
+            position: absolute; 
+        }
+
+        #close-desc {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            color: #aaa;
+            transition: color 0.2s;
+        }
+
+        #close-desc:hover {
+            color: white;
+        }
+
         </style>
     </head>
+
+    <div id="description-box">
+        <span id="close-desc">❌</span> <h2 id="desc-title"></h2>
+        <p id="desc-text"></p>
+    </div>
 
     <body>
 
@@ -135,6 +172,19 @@
     const mouse = new THREE.Vector2();
     const mousePos = { x: 0, y: 0 };
     const label = document.getElementById("info-label");
+
+    // deskripsi scene
+    const layerDescriptions = {
+        "Crust (Kerak Bumi)": 
+            "Kerak adalah lapisan terluar Bumi, terdiri dari batuan padat. Ketebalannya bervariasi antara 5–70 km.",
+        "Mantle (Mantel)": 
+            "Mantel adalah lapisan tebal yang terdiri dari batuan semi-padat berperilaku plastis. Pada mantel terjadi pergerakan konveksi.",
+        "Outer Core (Inti Luar)": 
+            "Inti Luar adalah lapisan logam cair (nikel dan besi). Gerakannya menghasilkan medan magnet Bumi.",
+        "Inner Core (Inti Dalam)": 
+            "Inti Dalam adalah bola logam padat dengan suhu mencapai 5000°C. Tekanannya sangat besar sehingga besi tetap padat."
+    };
+
 
     // === Scene ===
     const scene = new THREE.Scene();
@@ -225,6 +275,11 @@
     scene.add(inner, outer, mantle, crust);
     const layers = [crust, mantle, outer, inner];
 
+    // tutup deskripsi
+    const descriptionBox = document.getElementById("description-box");
+    document.getElementById("close-desc").onclick = () => {
+        descriptionBox.style.display = "none";
+    };
     // === UI LOGIC ===
     document.getElementById("toggle-transparency").onclick = () => {
         isTransparent = !isTransparent;
@@ -267,6 +322,24 @@
             isHoveringUI = false;
         }
     });
+    window.addEventListener("click", () => {
+        if (isHoveringUI) return;
+        
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(layers);
+
+        if (intersects.length > 0) {
+             const obj = intersects[0].object;
+             const title = obj.userData.name;
+             const desc = layerDescriptions[title] || "Tidak ada deskripsi.";
+            
+            // description-box ditampilkan
+             descriptionBox.style.display = "block"; 
+             document.getElementById("desc-title").textContent = title;
+             document.getElementById("desc-text").textContent = desc;
+        }
+    });
+
 
     function checkHover(){
         if (isHoveringUI) return;
