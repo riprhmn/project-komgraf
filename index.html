@@ -188,7 +188,7 @@
     const camera = new THREE.PerspectiveCamera(
         75, window.innerWidth / window.innerHeight, 0.1, 1000
     );
-    camera.position.z = 12;
+    camera.position.z = 8;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -201,7 +201,7 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.enablePan = false;
-    controls.minDistance = 0.1; 
+    controls.minDistance = 0; 
     controls.maxDistance = 40;
 
     // === Cahaya ===
@@ -271,6 +271,7 @@
     scene.add(inner, outer, mantle, crust);
     const layers = [crust, mantle, outer, inner];
 
+    //  haii
     // tutup deskripsi
     const descriptionBox = document.getElementById("description-box");
     document.getElementById("close-desc").onclick = () => {
