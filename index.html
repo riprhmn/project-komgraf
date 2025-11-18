@@ -74,6 +74,14 @@
             font-weight: bold;
         }
 
+        /* Tombol Mute Khusus */
+        #toggle-audio {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
         /* Tombol Zoom lebih kecil di baris kedua */
         .zoom-btn {
             font-size: 18px;
@@ -84,7 +92,7 @@
         /* === MENU LAYER (KIRI TENGAH) === */
         #layer-menu {
             position: absolute;
-            top: 160px; /* Jarak dari atas sesuai sketsa */
+            top: 200px; /* Turun sedikit karena ada tombol mute */
             left: 20px;
             width: 180px;
             display: flex;
@@ -109,7 +117,6 @@
             background: rgba(255, 255, 255, 0.2);
             color: white;
             border: 1px solid white;
-            /* Border kiri tetap warna masing-masing */
         }
         #btn-crust.active { border-left: 4px solid #5c4033; }
         #btn-mantle.active { border-left: 4px solid #cc5500; }
@@ -167,6 +174,7 @@
         <div id="main-title">Visualisasi Lapisan Bumi</div>
 
         <div id="top-ui">
+            <button id="toggle-audio">🔊 Voice Over: ON</button>
             <button id="toggle-transparency">Buat Transparan</button>
             <button id="toggle-clipping">Toggle Irisan</button>
             
@@ -205,11 +213,21 @@
     import * as THREE from "three";
     import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-    // === Variabel Global ===
     let isTransparent = false;
     let isClipped = false;
     let isHoveringUI = false;
-    let currentActiveLayer = 'all'; // Melacak layer mana yang sedang dilihat
+    let currentActiveLayer = 'all'; 
+
+    let isMuted = false;
+    let currentAudio = null; 
+
+    //KONFIGURASI AUDIO FILES
+    const audioFiles = {
+        "Crust (Kerak Bumi)": "audio_crust.mp3",
+        "Mantle (Mantel)": "audio_mantle.mp3",
+        "Outer Core (Inti Luar)": "audio_outer.mp3",
+        "Inner Core (Inti Dalam)": "audio_inner.mp3"
+    };
 
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
@@ -217,7 +235,6 @@
     const label = document.getElementById("info-label");
     const descriptionBox = document.getElementById("description-box");
 
-    // Deskripsi Data
     const layerDescriptions = {
         "Crust (Kerak Bumi)": 
             "Kerak adalah lapisan terluar Bumi, tempat kita tinggal. Terdiri dari batuan padat dan mineral. Ketebalannya bervariasi: 5-10 km di bawah samudra dan 30-70 km di bawah benua.",
@@ -229,11 +246,37 @@
             "Inti Dalam adalah bola besi-nikel padat dengan radius 1.220 km. Meskipun suhunya sepanas permukaan Matahari (5.400°C), tekanan ekstrem membuatnya tetap padat."
     };
 
-    // === Scene Setup ===
+    //FUNGSI AUDIO CONTROL
+    function playVoiceOver(layerName) {
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+        }
+
+        if (isMuted) return;
+
+        const fileName = audioFiles[layerName];
+        if (fileName) {
+            currentAudio = new Audio(fileName);
+            currentAudio.volume = 1.0;
+            currentAudio.play().catch(error => {
+                console.warn("Gagal memutar audio (mungkin file tidak ada):", error);
+            });
+        }
+    }
+
+    function stopAudio() {
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+        }
+    }
+
+    //Scene Setup
     const scene = new THREE.Scene();
-    const capsGroup = new THREE.Group(); // Group penampung tutup irisan
+    const capsGroup = new THREE.Group();
     scene.add(capsGroup);
-    capsGroup.visible = false; // Default mati
+    capsGroup.visible = false;
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.z = 12;
@@ -251,31 +294,25 @@
     controls.minDistance = 0.1; 
     controls.maxDistance = 40;
 
-    // Cahaya
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
     sunLight.position.set(5, 3, 5);
     scene.add(sunLight);
 
-    // Bidang Irisan (Clipping Planes)
     const clipPlanes = [
-        new THREE.Plane(new THREE.Vector3(1, 0, 0), 0), // Potong sumbu X
-        new THREE.Plane(new THREE.Vector3(0, -1, 0), 0) // Potong sumbu Y
+        new THREE.Plane(new THREE.Vector3(1, 0, 0), 0),
+        new THREE.Plane(new THREE.Vector3(0, -1, 0), 0) 
     ];
 
-    // === Texture Loading ===
+    //Texture Loading
     const texLoader = new THREE.TextureLoader();
     const tCrust = texLoader.load("peta_kerak.png"); 
     const tInner = texLoader.load("inti_dalam.jpg");
     const tOuter = texLoader.load("inti_luar.jpg");
     const tMantle = texLoader.load("mantel.jpg");
 
-    // === Create Layer Function ===
-    // Fungsi helper untuk membuat Mesh Layer sekaligus Tutupnya (Cap)
-    // agar tersimpan rapi dalam satu objek.
+    //Create Layer Function
     function createLayer(name, radius, texture, color, emissiveColor, isInnerMost = false) {
-        
-        // 1. Buat Bola Utama
         const geometry = new THREE.SphereGeometry(radius, 64, 64);
         const material = new THREE.MeshStandardMaterial({
             map: texture,
@@ -289,73 +326,42 @@
             transparent: name === "Outer Core (Inti Luar)" ? true : false,
             opacity: name === "Outer Core (Inti Luar)" ? 0.85 : 1.0
         });
-        
         const mesh = new THREE.Mesh(geometry, material);
         mesh.userData.name = name;
         
-        // 2. Buat Tutup (Cap) untuk layer ini
-        // Hitung radius dalam (untuk membuat cincin). Jika Inner Core, radius dalam = 0.
         let innerRadius = 0;
-        if (!isInnerMost) {
-             // Logika sederhana: radius dalam kira-kira radius layer di bawahnya
-             // Kita set manual nanti saat inisialisasi agar presisi, tapi ini default
-             innerRadius = radius * 0.7; 
-        }
+        if (!isInnerMost) innerRadius = radius * 0.7; 
         
         return mesh;
     }
 
-    // === Inisialisasi Layer ===
-    
-    // 1. Inner Core (r=1.3)
     const inner = createLayer("Inner Core (Inti Dalam)", 1.3, tInner, 0xffffff, 0xffdd77, true);
     inner.material.emissiveIntensity = 0.6;
-
-    // 2. Outer Core (r=2.2)
     const outer = createLayer("Outer Core (Inti Luar)", 2.2, tOuter, 0xffb347, 0xff7f24);
     outer.material.emissiveIntensity = 0.3;
-
-    // 3. Mantle (r=3.0)
     const mantle = createLayer("Mantle (Mantel)", 3.0, tMantle, 0xffa64d, 0xcc6600);
-    
-    // 4. Crust (r=3.3)
     const crust = createLayer("Crust (Kerak Bumi)", 3.3, tCrust, 0xffffff, 0x222222);
     crust.material.roughness = 0.8;
 
     scene.add(inner, outer, mantle, crust);
-    const layers = [crust, mantle, outer, inner]; // Urutan untuk Raycaster (Luar ke Dalam)
-
-
-    // === Inisialisasi Tutup (Caps) ===
-    // Kita buat tutup secara manual agar pas, lalu kita 'tempel' ke objek layer
-    // supaya bisa kita kontrol visibilitasnya bersamaan.
+    const layers = [crust, mantle, outer, inner];
 
     function createAndAttachCap(layerObj, innerR, outerR, colorHex) {
         let geo;
         if (innerR === 0) geo = new THREE.CircleGeometry(outerR, 64);
         else geo = new THREE.RingGeometry(innerR, outerR, 64);
 
-        // Material Cap Horizontal (dipotong bidang vertikal)
-        const matH = new THREE.MeshBasicMaterial({ 
-            color: colorHex, side: THREE.DoubleSide, clippingPlanes: [clipPlanes[0]] 
-        });
-        // Material Cap Vertikal (dipotong bidang horizontal)
-        const matV = new THREE.MeshBasicMaterial({ 
-            color: colorHex, side: THREE.DoubleSide, clippingPlanes: [clipPlanes[1]] 
-        });
+        const matH = new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, clippingPlanes: [clipPlanes[0]] });
+        const matV = new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, clippingPlanes: [clipPlanes[1]] });
 
         const capY = new THREE.Mesh(geo, matH);
         capY.rotation.x = -Math.PI / 2;
-        
         const capX = new THREE.Mesh(geo, matV);
         capX.rotation.y = -Math.PI / 2;
 
         const group = new THREE.Group();
         group.add(capY, capX);
-
-        // SIMPAN REFERENSI CAP DI DALAM USERDATA LAYER
         layerObj.userData.capMesh = group; 
-        
         capsGroup.add(group);
     }
 
@@ -365,65 +371,79 @@
     createAndAttachCap(crust, 3.0, 3.3, 0x331100);
 
 
-    // === LOGIKA GANTI LAYER (MENU) ===
+    //LOGIKA GANTI LAYER (MENU)
     window.switchLayer = function(layerName) {
         currentActiveLayer = layerName;
-
-        // Reset UI Buttons
         document.querySelectorAll('.layer-btn').forEach(btn => btn.classList.remove('active'));
 
-        // 1. Jika "Tampilkan Semua"
         if (layerName === 'all') {
             document.getElementById('btn-all').classList.add('active');
             descriptionBox.style.display = 'none';
+            
 
-            // Nyalakan semua layer dan cap-nya
+            stopAudio();
+
             layers.forEach(l => {
                 l.visible = true;
                 if(l.userData.capMesh) l.userData.capMesh.visible = true;
             });
         } 
-        // 2. Jika memilih salah satu layer
         else {
-            // Highlight tombol yang benar
+
+            playVoiceOver(layerName);
+
             if(layerName.includes("Crust")) document.getElementById('btn-crust').classList.add('active');
             if(layerName.includes("Mantle")) document.getElementById('btn-mantle').classList.add('active');
             if(layerName.includes("Outer")) document.getElementById('btn-outer').classList.add('active');
             if(layerName.includes("Inner")) document.getElementById('btn-inner').classList.add('active');
 
-            // Loop semua layer: Matikan yang lain, Nyalakan yang dipilih
             layers.forEach(l => {
                 if (l.userData.name === layerName) {
                     l.visible = true;
                     if(l.userData.capMesh) l.userData.capMesh.visible = true;
                     
-                    // Munculkan deskripsi otomatis
                     descriptionBox.style.display = "block";
                     document.getElementById("desc-title").textContent = l.userData.name;
                     document.getElementById("desc-text").textContent = layerDescriptions[l.userData.name];
                 } else {
                     l.visible = false;
-                    // Sembunyikan juga cap layer yang tidak aktif
                     if(l.userData.capMesh) l.userData.capMesh.visible = false;
                 }
             });
         }
     };
 
+    const btnMute = document.getElementById("toggle-audio");
+    btnMute.onclick = () => {
+        isMuted = !isMuted;
+        if (isMuted) {
+            stopAudio();
+            btnMute.textContent = "🔇 Voice Over: OFF";
+            btnMute.style.borderColor = "#ff4444";
+            btnMute.style.color = "#ffaaaa";
+        } else {
+            btnMute.textContent = "🔊 Voice Over: ON";
+            btnMute.style.borderColor = "rgba(255,255,255,0.3)";
+            btnMute.style.color = "#ddd";
+        }
+    };
 
-    // === UI Logic: Tombol Standard ===
     document.getElementById("close-desc").onclick = () => {
         descriptionBox.style.display = "none";
-        // Opsional: Kembali ke view 'all' jika ditutup? 
-        // switchLayer('all'); 
+        stopAudio();
     };
 
     document.getElementById("toggle-transparency").onclick = () => {
         isTransparent = !isTransparent;
-        mantle.opacity = isTransparent ? 0.5 : 1.0;
-        mantle.transparent = isTransparent;
-        crust.opacity = isTransparent ? 0.6 : 1.0;
-        crust.transparent = isTransparent;
+
+        mantle.material.opacity = isTransparent ? 0.5 : 1.0;
+        mantle.material.transparent = isTransparent;
+        mantle.material.needsUpdate = true;
+
+        crust.material.opacity = isTransparent ? 0.6 : 1.0;
+        crust.material.transparent = isTransparent;
+        crust.material.needsUpdate = true;
+
         document.getElementById("toggle-transparency").textContent =
             isTransparent ? "Buat Solid" : "Buat Transparan";
     };
@@ -431,12 +451,11 @@
     document.getElementById("toggle-clipping").onclick = () => {
         isClipped = !isClipped;
         renderer.localClippingEnabled = isClipped;
-        capsGroup.visible = isClipped; // Master switch untuk caps
+        capsGroup.visible = isClipped; 
         document.getElementById("toggle-clipping").textContent =
             isClipped ? "Tampilkan Penuh" : "Toggle Irisan";
     };
 
-    // === UI Logic: Zoom ===
     const zoomStep = 1.5;
     function updateZoom(isZoomIn) {
         const currentDist = camera.position.distanceTo(controls.target);
@@ -450,7 +469,6 @@
     document.getElementById("zoom-in").onclick = () => updateZoom(true);
     document.getElementById("zoom-out").onclick = () => updateZoom(false);
 
-    // === Mouse Logic ===
     window.addEventListener("mousemove", (e)=>{
         mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -460,20 +478,17 @@
         if (isHoveringUI) label.style.display = 'none';
     });
 
-    // Klik Objek (hanya aktif jika dalam mode All, kalau mode single layer sudah otomatis deskripsi)
     window.addEventListener("click", () => {
         if (isHoveringUI) return;
-        if (currentActiveLayer !== 'all') return; // Jangan override jika sedang mode fokus layer
+        if (currentActiveLayer !== 'all') return; 
 
         raycaster.setFromCamera(mouse, camera);
-        // Hanya raycast ke layer yang sedang visible
         const visibleLayers = layers.filter(l => l.visible);
         const intersects = raycaster.intersectObjects(visibleLayers);
 
         let foundObj = null;
         for (let i = 0; i < intersects.length; i++) {
             const hit = intersects[i];
-            // Cek Clipping
             if (isClipped) {
                 let isHidden = false;
                 for (const plane of clipPlanes) {
@@ -487,11 +502,14 @@
 
         if (foundObj) {
              const title = foundObj.userData.name;
+             
+             // Play Audio
+             playVoiceOver(title);
+
              descriptionBox.style.display = "block"; 
              document.getElementById("desc-title").textContent = title;
              document.getElementById("desc-text").textContent = layerDescriptions[title];
              
-             // Highlight tombol menu yang sesuai secara visual saja
              document.querySelectorAll('.layer-btn').forEach(btn => btn.classList.remove('active'));
              if(title.includes("Crust")) document.getElementById('btn-crust').classList.add('active');
              else if(title.includes("Mantle")) document.getElementById('btn-mantle').classList.add('active');
@@ -500,7 +518,6 @@
         }
     });
 
-    // Hover Tooltip
     function checkHover(){
         if (isHoveringUI) return;
         raycaster.setFromCamera(mouse, camera);
@@ -542,10 +559,7 @@
     function animate(){
         requestAnimationFrame(animate);
         const speed = 0.0015; 
-        
-        // Putar semua layer
         layers.forEach(l => l.rotation.y += speed);
-
         controls.update();
         checkHover();
         renderer.render(scene, camera);
