@@ -9,7 +9,7 @@
         body { 
             margin: 0; 
             overflow: hidden;
-            background-color: #ffffff;
+            background-color: #272727;
             background-image: 
                 linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
@@ -298,13 +298,36 @@
             isClipped ? "Tampilkan Penuh" : "Toggle Irisan";
     };
 
+    // === LOGIKA ZOOM TOMBOL
+    
     const zoomStep = 1.5;
+
+    // Fungsi helper untuk melakukan zoom yang aman terhadap rotasi
+    function updateZoom(isZoomIn) {
+        // 1. Hitung jarak saat ini dari kamera ke titik tengah (0,0,0)
+        const currentDist = camera.position.distanceTo(controls.target);
+        let newDist;
+
+        // 2. Tentukan jarak baru berdasarkan batas min/max controls
+        if (isZoomIn) {
+            newDist = Math.max(currentDist - zoomStep, controls.minDistance);
+        } else {
+            newDist = Math.min(currentDist + zoomStep, controls.maxDistance);
+        }
+
+        // 3. Ubah panjang vektor posisi kamera (mendekat/menjauh) tanpa mengubah sudut pandang
+        camera.position.setLength(newDist);
+        
+        // 4. Update controls agar sinkron dengan posisi baru
+        controls.update(); 
+    }
+
     document.getElementById("zoom-in").onclick = () => {
-        camera.position.z = Math.max(camera.position.z - zoomStep, controls.minDistance);
+        updateZoom(true);
     };
 
     document.getElementById("zoom-out").onclick = () => {
-        camera.position.z = Math.min(camera.position.z + zoomStep, controls.maxDistance);
+        updateZoom(false);
     };
 
 
