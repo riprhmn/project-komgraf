@@ -9,12 +9,9 @@
         body { 
             margin: 0; 
             overflow: hidden;
-            background-color: #272727;
-            background-image: 
-                linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-            background-size: 55px 55px;
-            background-position: center center;
+            background-color: #000000; 
+            /* Gradasi radial: terang di tengah, gelap di pinggir */
+            background-image: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #000000 70%);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
@@ -583,10 +580,42 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
+    function createStars() {
+        const starGeometry = new THREE.BufferGeometry();
+        const starCount = 3000; // Jumlah bintang
+        const posArray = new Float32Array(starCount * 3); // x, y, z untuk setiap bintang
+
+        for(let i = 0; i < starCount * 3; i++) {
+            // Sebar bintang secara acak di area seluas 100 unit
+            posArray[i] = (Math.random() - 0.5) * 100; 
+        }
+
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+
+        const starMaterial = new THREE.PointsMaterial({
+            size: 0.08,       // Ukuran bintang
+            color: 0xffffff,  // Warna putih
+            transparent: true,
+            opacity: 0.8,
+        });
+
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+        return stars; 
+    }
+
+    // Panggil fungsinya
+    const starField = createStars();
+
     function animate(){
         requestAnimationFrame(animate);
         const speed = 0.0015; 
         layers.forEach(l => l.rotation.y += speed);
+        controls.update();
+        checkHover();
+        renderer.render(scene, camera);
+        starField.rotation.y -= 0.0002; 
+
         controls.update();
         checkHover();
         renderer.render(scene, camera);
