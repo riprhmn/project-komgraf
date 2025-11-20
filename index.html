@@ -457,17 +457,27 @@
     document.getElementById("toggle-transparency").onclick = () => {
         isTransparent = !isTransparent;
 
-        const setOpacity = (layerGroup, opValOuter, opValInner) => {
+        const setOpacity = (layerGroup, isTransparentFlag, opacityValue) => {
+            const isOuterCoreDefault = layerGroup.userData.name === "Outer Core (Inti Luar)";
+            const defaultOpacity = isOuterCoreDefault ? 0.85 : 1.0;
+            
             layerGroup.children.forEach(mesh => {
-                mesh.material.transparent = isTransparent;
-
-                mesh.material.opacity = (mesh.material.side === THREE.BackSide) ? opValInner : opValOuter;
+                // If turning transparency on, set transparent flag and opacity
+                if (isTransparentFlag) {
+                    mesh.material.transparent = true;
+                    mesh.material.opacity = opacityValue;
+                } else { // otherwise, revert to default
+                    mesh.material.transparent = isOuterCoreDefault;
+                    mesh.material.opacity = defaultOpacity;
+                }
                 mesh.material.needsUpdate = true;
             });
         };
 
-        setOpacity(mantle, 0.5, 0.5);
-        setOpacity(crust, 0.6, 0.6);  
+        setOpacity(crust, isTransparent, 0.6);
+        setOpacity(mantle, isTransparent, 0.5);
+        setOpacity(outer, isTransparent, 0.4);
+        
         document.getElementById("toggle-transparency").textContent =
             isTransparent ? "Buat Solid" : "Buat Transparan";
     };
@@ -633,9 +643,6 @@
         requestAnimationFrame(animate);
         const speed = 0.0015; 
         layers.forEach(l => l.rotation.y += speed);
-        controls.update();
-        checkHover();
-        renderer.render(scene, camera);
         starField.rotation.y -= 0.0002; 
 
         controls.update();
