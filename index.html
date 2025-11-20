@@ -580,23 +580,46 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
+// === FUNGSI MEMBUAT TEKSTUR BINTANG (GLOW) ===
+    function getStarTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        
+        const ctx = canvas.getContext('2d');
+        
+        const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');          
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 32, 32);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        return texture;
+    }
+
     function createStars() {
         const starGeometry = new THREE.BufferGeometry();
-        const starCount = 3000; // Jumlah bintang
-        const posArray = new Float32Array(starCount * 3); // x, y, z untuk setiap bintang
+        const starCount = 3000; 
+        const posArray = new Float32Array(starCount * 3); 
 
         for(let i = 0; i < starCount * 3; i++) {
-            // Sebar bintang secara acak di area seluas 100 unit
             posArray[i] = (Math.random() - 0.5) * 100; 
         }
 
         starGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
 
         const starMaterial = new THREE.PointsMaterial({
-            size: 0.08,       // Ukuran bintang
-            color: 0xffffff,  // Warna putih
+            size: 0.5,
+            map: getStarTexture(),
             transparent: true,
-            opacity: 0.8,
+            opacity: 0.9,
+            color: 0xffffff,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
         });
 
         const stars = new THREE.Points(starGeometry, starMaterial);
@@ -604,9 +627,8 @@
         return stars; 
     }
 
-    // Panggil fungsinya
     const starField = createStars();
-
+    
     function animate(){
         requestAnimationFrame(animate);
         const speed = 0.0015; 
