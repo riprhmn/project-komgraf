@@ -639,6 +639,22 @@
         opacity: 1;
       }
 
+      .save-timeline {
+        cursor: pointer;
+        font-size: 14px;
+        padding: 6px 12px;
+        background: rgba(255, 204, 0, 0.3);
+        border: 1px solid #ffcc00;
+        border-radius: 6px;
+        color: #ffcc00;
+        transition: all 0.2s;
+        font-weight: 600;
+      }
+      .save-timeline:hover {
+        background: #ffcc00;
+        color: #000;
+      }
+
       .timeline-slider-container {
         margin: 20px 0;
       }
@@ -1217,7 +1233,12 @@
     <div id="timeline-panel">
       <div class="timeline-header">
         <div class="timeline-title">⏳ Timeline Evolusi Bumi</div>
-        <span class="close-timeline" id="close-timeline">✖</span>
+        <div style="display: flex; gap: 10px; align-items: center">
+          <button class="save-timeline" id="save-timeline">
+            💾 Simpan Era
+          </button>
+          <span class="close-timeline" id="close-timeline">✖</span>
+        </div>
       </div>
 
       <div class="timeline-slider-container">
@@ -1471,7 +1492,7 @@
           temp: "80-100°C",
           oxygen: "0%",
           volcanic: "Sangat Tinggi",
-          crustColor: 0x884400,
+          crustColor: 0x884400, // Coklat kemerahan
           mantleEmissive: 0.6,
           innerEmissive: 0.9,
         },
@@ -1484,7 +1505,7 @@
           temp: "50-70°C",
           oxygen: "0.1%",
           volcanic: "Tinggi",
-          crustColor: 0x665533,
+          crustColor: 0x665533, // Coklat tua
           mantleEmissive: 0.5,
           innerEmissive: 0.8,
         },
@@ -1497,7 +1518,7 @@
           temp: "30-50°C",
           oxygen: "1-10%",
           volcanic: "Sedang-Tinggi",
-          crustColor: 0x556644,
+          crustColor: 0x7d6a55, // Coklat keabuan (rust/iron oxide)
           mantleEmissive: 0.4,
           innerEmissive: 0.7,
         },
@@ -1510,7 +1531,7 @@
           temp: "-50 to 0°C",
           oxygen: "10%",
           volcanic: "Sedang",
-          crustColor: 0xccddff,
+          crustColor: 0xccddff, // Putih kebiruan (es)
           mantleEmissive: 0.3,
           innerEmissive: 0.6,
         },
@@ -1523,7 +1544,7 @@
           temp: "20-25°C",
           oxygen: "15%",
           volcanic: "Sedang",
-          crustColor: 0x447733,
+          crustColor: 0x8b7355, // Coklat kehijauan (tanah dengan vegetasi awal)
           mantleEmissive: 0.3,
           innerEmissive: 0.6,
         },
@@ -1536,7 +1557,7 @@
           temp: "18-22°C",
           oxygen: "20%",
           volcanic: "Sedang",
-          crustColor: 0x558844,
+          crustColor: 0x558844, // Hijau kecoklatan (vegetasi subur)
           mantleEmissive: 0.25,
           innerEmissive: 0.6,
         },
@@ -1549,7 +1570,7 @@
           temp: "10-15°C",
           oxygen: "21%",
           volcanic: "Sangat Tinggi",
-          crustColor: 0x665544,
+          crustColor: 0x665544, // Coklat gelap (debu dan abu)
           mantleEmissive: 0.4,
           innerEmissive: 0.65,
         },
@@ -1562,7 +1583,7 @@
           temp: "15°C",
           oxygen: "21%",
           volcanic: "Sedang",
-          crustColor: 0x447733,
+          crustColor: 0x6b8e23, // Olive green (bumi modern dengan vegetasi)
           mantleEmissive: 0.2,
           innerEmissive: 0.6,
         },
@@ -1768,7 +1789,320 @@
       ];
 
       const texLoader = new THREE.TextureLoader();
+      let originalCrustTexture = null;
+      let eraTextures = {}; // Cache tekstur yang sudah dibuat
+      let currentEraIndex = 8; // Default: Era Modern
+
+      // Fungsi membuat tekstur prosedural untuk era tertentu
+      function createEraTexture(era) {
+        // Cek cache dulu
+        if (eraTextures[era.index]) {
+          return eraTextures[era.index];
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = 1024;
+        canvas.height = 512;
+        const ctx = canvas.getContext("2d");
+
+        // Background base color
+        ctx.fillStyle = "#" + era.crustColor.toString(16).padStart(6, "0");
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Era-specific textures
+        switch (era.index) {
+          case 0: // Hadean - Lava Ocean
+            drawLavaTexture(ctx, canvas.width, canvas.height);
+            break;
+
+          case 1: // Archean Awal - Volcanic crust
+            drawVolcanicTexture(ctx, canvas.width, canvas.height);
+            break;
+
+          case 2: // Archean Akhir - Early ocean & land
+            drawEarlyOceanTexture(ctx, canvas.width, canvas.height);
+            break;
+
+          case 3: // Proterozoic - Iron bands
+            drawIronBandsTexture(ctx, canvas.width, canvas.height);
+            break;
+
+          case 4: // Snowball Earth - Ice covered
+            drawIceTexture(ctx, canvas.width, canvas.height);
+            break;
+
+          case 5: // Paleozoic - Early continents
+            drawEarlyContinentsTexture(ctx, canvas.width, canvas.height);
+            break;
+
+          case 6: // Mesozoic - Pangea breakup
+            drawMesozoicTexture(ctx, canvas.width, canvas.height);
+            break;
+
+          case 7: // Asteroid impact - Dust and fire
+            drawAsteroidImpactTexture(ctx, canvas.width, canvas.height);
+            break;
+
+          case 8: // Modern - Current Earth
+            // Gunakan tekstur asli
+            return originalCrustTexture;
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+
+        // Simpan ke cache
+        eraTextures[era.index] = texture;
+
+        return texture;
+      }
+
+      // TEKSTUR 1: Lava Ocean (Hadean)
+      function drawLavaTexture(ctx, width, height) {
+        // Lava flows
+        for (let i = 0; i < 100; i++) {
+          const x = Math.random() * width;
+          const y = Math.random() * height;
+          const radius = 20 + Math.random() * 40;
+
+          const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+          gradient.addColorStop(0, "#ffff00");
+          gradient.addColorStop(0.3, "#ff6600");
+          gradient.addColorStop(1, "rgba(255, 0, 0, 0)");
+
+          ctx.fillStyle = gradient;
+          ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+        }
+
+        // Cracks
+        ctx.strokeStyle = "#ff0000";
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 50; i++) {
+          ctx.beginPath();
+          ctx.moveTo(Math.random() * width, Math.random() * height);
+          ctx.lineTo(Math.random() * width, Math.random() * height);
+          ctx.stroke();
+        }
+      }
+
+      // TEKSTUR 2: Volcanic (Archean Awal)
+      function drawVolcanicTexture(ctx, width, height) {
+        // Dark volcanic rock pattern
+        for (let i = 0; i < 200; i++) {
+          const x = Math.random() * width;
+          const y = Math.random() * height;
+          const size = 5 + Math.random() * 15;
+
+          ctx.fillStyle = `rgba(${50 + Math.random() * 50}, ${
+            30 + Math.random() * 30
+          }, 0, 0.6)`;
+          ctx.fillRect(x, y, size, size);
+        }
+
+        // Lava streams
+        ctx.strokeStyle = "#ff4400";
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 30; i++) {
+          ctx.beginPath();
+          ctx.moveTo(Math.random() * width, 0);
+          ctx.quadraticCurveTo(
+            Math.random() * width,
+            height / 2,
+            Math.random() * width,
+            height
+          );
+          ctx.stroke();
+        }
+      }
+
+      // TEKSTUR 3: Early Ocean (Archean Akhir)
+      function drawEarlyOceanTexture(ctx, width, height) {
+        // Ocean (biru kehijauan)
+        ctx.fillStyle = "#336666";
+        ctx.fillRect(0, 0, width, height);
+
+        // Land masses (coklat tua)
+        for (let i = 0; i < 15; i++) {
+          ctx.fillStyle = "#553322";
+          ctx.beginPath();
+          const x = Math.random() * width;
+          const y = Math.random() * height;
+          const radius = 50 + Math.random() * 100;
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Stromatolites (small circles)
+        ctx.fillStyle = "#224422";
+        for (let i = 0; i < 100; i++) {
+          const x = Math.random() * width;
+          const y = Math.random() * height;
+          ctx.beginPath();
+          ctx.arc(x, y, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // TEKSTUR 4: Iron Bands (Proterozoic)
+      function drawIronBandsTexture(ctx, width, height) {
+        // Horizontal iron oxide bands
+        const bandHeight = 20;
+        for (let y = 0; y < height; y += bandHeight) {
+          const colors = ["#8b7355", "#aa4444", "#665544", "#cc6666"];
+          ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+          ctx.fillRect(0, y, width, bandHeight);
+        }
+
+        // Add noise
+        ctx.globalAlpha = 0.3;
+        for (let i = 0; i < 500; i++) {
+          ctx.fillStyle = Math.random() > 0.5 ? "#ffffff" : "#000000";
+          ctx.fillRect(Math.random() * width, Math.random() * height, 2, 2);
+        }
+        ctx.globalAlpha = 1.0;
+      }
+
+      // TEKSTUR 5: Ice (Snowball Earth)
+      function drawIceTexture(ctx, width, height) {
+        // Base ice color
+        ctx.fillStyle = "#e6f2ff";
+        ctx.fillRect(0, 0, width, height);
+
+        // Ice cracks (dark blue)
+        ctx.strokeStyle = "#4d94ff";
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 100; i++) {
+          ctx.beginPath();
+          ctx.moveTo(Math.random() * width, Math.random() * height);
+          ctx.lineTo(Math.random() * width, Math.random() * height);
+          ctx.stroke();
+        }
+
+        // Snow patches (white)
+        ctx.fillStyle = "#ffffff";
+        for (let i = 0; i < 50; i++) {
+          const x = Math.random() * width;
+          const y = Math.random() * height;
+          const radius = 10 + Math.random() * 30;
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Ice crystals sparkle
+        ctx.fillStyle = "#ffffff";
+        for (let i = 0; i < 200; i++) {
+          ctx.fillRect(Math.random() * width, Math.random() * height, 1, 1);
+        }
+      }
+
+      // TEKSTUR 6: Early Continents (Paleozoic)
+      function drawEarlyContinentsTexture(ctx, width, height) {
+        // Ocean base
+        ctx.fillStyle = "#2266aa";
+        ctx.fillRect(0, 0, width, height);
+
+        // Pangea supercontinent
+        ctx.fillStyle = "#8b7355";
+        ctx.beginPath();
+        ctx.arc(width / 2, height / 2, 150, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Vegetation patches (early green)
+        ctx.fillStyle = "#556633";
+        for (let i = 0; i < 30; i++) {
+          const x = width / 2 + (Math.random() - 0.5) * 250;
+          const y = height / 2 + (Math.random() - 0.5) * 250;
+          const radius = 10 + Math.random() * 20;
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // TEKSTUR 7: Mesozoic (Era Dinosaurus)
+      function drawMesozoicTexture(ctx, width, height) {
+        // Ocean
+        ctx.fillStyle = "#1a5490";
+        ctx.fillRect(0, 0, width, height);
+
+        // Continents (breaking apart)
+        const continents = [
+          { x: width * 0.3, y: height * 0.4, radius: 80 },
+          { x: width * 0.7, y: height * 0.5, radius: 90 },
+          { x: width * 0.5, y: height * 0.7, radius: 70 },
+        ];
+
+        continents.forEach((cont) => {
+          // Land
+          ctx.fillStyle = "#6b8e23";
+          ctx.beginPath();
+          ctx.arc(cont.x, cont.y, cont.radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Lush vegetation
+          ctx.fillStyle = "#228b22";
+          for (let i = 0; i < 20; i++) {
+            const x = cont.x + (Math.random() - 0.5) * cont.radius;
+            const y = cont.y + (Math.random() - 0.5) * cont.radius;
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        });
+      }
+
+      // TEKSTUR 8: Asteroid Impact
+      function drawAsteroidImpactTexture(ctx, width, height) {
+        // Dark dusty atmosphere
+        ctx.fillStyle = "#332211";
+        ctx.fillRect(0, 0, width, height);
+
+        // Impact crater (Yucatan)
+        const impactX = width * 0.3;
+        const impactY = height * 0.5;
+
+        // Crater glow
+        const gradient = ctx.createRadialGradient(
+          impactX,
+          impactY,
+          0,
+          impactX,
+          impactY,
+          150
+        );
+        gradient.addColorStop(0, "#ffff00");
+        gradient.addColorStop(0.3, "#ff6600");
+        gradient.addColorStop(0.7, "#ff0000");
+        gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(impactX - 150, impactY - 150, 300, 300);
+
+        // Debris and fire
+        ctx.fillStyle = "#ff4400";
+        for (let i = 0; i < 50; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 150 + Math.random() * 200;
+          const x = impactX + Math.cos(angle) * dist;
+          const y = impactY + Math.sin(angle) * dist;
+          const size = 5 + Math.random() * 15;
+          ctx.fillRect(x, y, size, size);
+        }
+
+        // Dust clouds
+        ctx.fillStyle = "rgba(100, 80, 60, 0.5)";
+        for (let i = 0; i < 30; i++) {
+          const x = Math.random() * width;
+          const y = Math.random() * height;
+          const radius = 20 + Math.random() * 50;
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
       const tCrust = texLoader.load("peta_kerak.png");
+      originalCrustTexture = tCrust;
       const tInner = texLoader.load("inti_dalam.jpg");
       const tOuter = texLoader.load("inti_luar.jpg");
       const tMantle = texLoader.load("mantel.jpg");
@@ -3047,21 +3381,19 @@
       // FUNGSI UTAMA UPDATE EARTH VISUALS
       // ========================================
       function updateEarthVisuals(era) {
-        const transitionDuration = 1000; // 1 detik transisi
+        const transitionDuration = 1000;
+        currentEraIndex = era.index; // Simpan era saat ini
 
-        // Animasi warna kerak bumi dengan transisi smooth
+        // Update tekstur crust dengan tekstur prosedural era
+        const eraTexture = createEraTexture(era);
+
         crust.children.forEach((mesh) => {
-          const startColor = mesh.material.color.getHex();
-          const endColor = era.crustColor;
+          // Set tekstur era
+          mesh.material.map = eraTexture;
+          mesh.material.color.setHex(0xffffff); // Reset ke putih agar tekstur terlihat
+          mesh.material.needsUpdate = true;
 
-          animateColorTransition(
-            mesh.material,
-            startColor,
-            endColor,
-            transitionDuration
-          );
-
-          // Update emissive untuk efek panas (era purba lebih panas)
+          // Update emissive untuk efek panas
           animateEmissiveTransition(
             mesh.material,
             era.mantleEmissive * 0.3,
@@ -3069,7 +3401,7 @@
           );
         });
 
-        // Animasi mantle dengan intensitas emissive
+        // Animasi mantle
         mantle.children.forEach((mesh) => {
           animateEmissiveTransition(
             mesh.material,
@@ -3077,9 +3409,7 @@
             transitionDuration
           );
 
-          // Tambahkan efek transparansi untuk era purba (lebih cair)
           if (era.index <= 2) {
-            // Era Hadean & Archean - mantel lebih cair
             mesh.material.transparent = true;
             animateOpacityTransition(mesh.material, 0.85, transitionDuration);
           } else {
@@ -3095,16 +3425,15 @@
             transitionDuration
           );
 
-          // Era purba: inner core lebih bercahaya
           if (era.index <= 1) {
-            const targetColor = new THREE.Color(0xffff00); // Kuning terang
+            const targetColor = new THREE.Color(0xffff00);
             animateEmissiveColorTransition(
               mesh.material,
               targetColor,
               transitionDuration
             );
           } else {
-            const targetColor = new THREE.Color(0xffdd77); // Normal
+            const targetColor = new THREE.Color(0xffdd77);
             animateEmissiveColorTransition(
               mesh.material,
               targetColor,
@@ -3122,7 +3451,6 @@
             transitionDuration
           );
 
-          // Era purba: outer core lebih aktif
           if (era.index <= 2) {
             mesh.material.transparent = true;
             animateOpacityTransition(mesh.material, 0.7, transitionDuration);
@@ -3131,10 +3459,7 @@
           }
         });
 
-        // Adjust lighting sesuai era
         updateLightingForEra(era);
-
-        // Tambahkan efek khusus untuk era tertentu
         addSpecialEraEffects(era);
       }
 
@@ -3490,20 +3815,147 @@
           timelinePanel.classList.add("show");
           btnToggleTimeline.classList.add("active");
 
-          // Update display ke era terakhir (modern)
-          updateTimelineDisplay(8);
+          // Update display ke era SAAT INI (bukan selalu ke era 8)
+          // Set slider value ke currentEraIndex
+          timelineSlider.value = currentEraIndex;
+          updateTimelineDisplay(currentEraIndex);
         }
       };
+
+      function restoreOriginalEarth() {
+        // Kembalikan tekstur asli crust
+        crust.children.forEach((mesh) => {
+          mesh.material.map = originalCrustTexture;
+          mesh.material.color.setHex(0xffffff); // Reset ke putih
+          mesh.material.emissive.setHex(0x222222);
+          mesh.material.emissiveIntensity = 0.2;
+          mesh.material.needsUpdate = true;
+        });
+
+        // Reset mantle
+        mantle.children.forEach((mesh) => {
+          mesh.material.emissiveIntensity = 0.2;
+          mesh.material.transparent = false;
+          mesh.material.opacity = 1.0;
+          mesh.material.needsUpdate = true;
+        });
+
+        // Reset inner core
+        inner.children.forEach((mesh) => {
+          mesh.material.emissive.setHex(0xffdd77);
+          mesh.material.emissiveIntensity = 0.6;
+          mesh.material.needsUpdate = true;
+        });
+
+        // Reset outer core
+        outer.children.forEach((mesh) => {
+          mesh.material.emissiveIntensity = 0.3;
+          mesh.material.transparent = true;
+          mesh.material.opacity = 0.85;
+          mesh.material.needsUpdate = true;
+        });
+
+        // Reset lighting
+        sunLight.intensity = 1.2;
+        scene.children.forEach((child) => {
+          if (child instanceof THREE.AmbientLight) {
+            child.intensity = 0.6;
+            child.color.setHex(0xffffff);
+          }
+        });
+
+        // Hapus efek era
+        eraEffects.forEach((effect) => {
+          scene.remove(effect);
+          if (effect.geometry) effect.geometry.dispose();
+          if (effect.material) {
+            if (effect.material.map) effect.material.map.dispose();
+            effect.material.dispose();
+          }
+        });
+        eraEffects = [];
+
+        currentEraIndex = 8;
+        timelineSlider.value = 8;
+      }
 
       btnCloseTimeline.onclick = () => {
         timelinePanel.classList.remove("show");
         btnToggleTimeline.classList.remove("active");
+        // restoreOriginalEarth();
       };
 
       timelineSlider.addEventListener("input", (e) => {
         const index = parseInt(e.target.value);
+        currentEraIndex = index;
         updateTimelineDisplay(index);
       });
+
+      document.getElementById("save-timeline").onclick = () => {
+        // Tutup panel timeline
+        timelinePanel.classList.remove("show");
+        btnToggleTimeline.classList.remove("active");
+
+        // JANGAN restore - biarkan bumi tetap di era yang dipilih
+        // Tampilkan notifikasi
+        showSaveNotification(geologicalTimeline[currentEraIndex].era);
+      };
+
+      // Fungsi notifikasi
+      function showSaveNotification(eraName) {
+        // Buat elemen notifikasi
+        const notification = document.createElement("div");
+        notification.style.position = "fixed";
+        notification.style.top = "80px";
+        notification.style.left = "50%";
+        notification.style.transform = "translateX(-50%)";
+        notification.style.background = "rgba(255, 204, 0, 0.95)";
+        notification.style.color = "#000";
+        notification.style.padding = "15px 30px";
+        notification.style.borderRadius = "8px";
+        notification.style.fontSize = "14px";
+        notification.style.fontWeight = "600";
+        notification.style.zIndex = "1000";
+        notification.style.boxShadow = "0 5px 20px rgba(0,0,0,0.5)";
+        notification.style.animation = "slideDown 0.3s ease-out";
+        notification.textContent = `✅ Era disimpan: ${eraName}`;
+
+        document.body.appendChild(notification);
+
+        // Hapus setelah 3 detik
+        setTimeout(() => {
+          notification.style.animation = "slideUp 0.3s ease-out";
+          setTimeout(() => {
+            document.body.removeChild(notification);
+          }, 300);
+        }, 3000);
+      }
+
+      // Tambahkan CSS animasi notifikasi
+      const style = document.createElement("style");
+      style.textContent = `
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+        @keyframes slideUp {
+          from {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+          to {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-20px);
+          }
+        }
+      `;
+      document.head.appendChild(style);
 
       // === ANIMATION LOOP (INI YANG PALING PENTING!) ===
       function animate() {
