@@ -1,378 +1,1882 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Visualisasi Lapisan Bumi - WebGL</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Visualisasi Lapisan Bumi - WebGL</title>
 
-        <style>
-        body { 
-            margin: 0; 
-            overflow: hidden;
-            background-color: #000000; 
-            /* Gradasi radial: terang di tengah, gelap di pinggir */
-            background-image: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #000000 70%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #000000;
+        background-image: radial-gradient(
+          circle at 50% 50%,
+          #1a1a2e 0%,
+          #000000 70%
+        );
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      canvas {
+        display: block;
+      }
+
+      /* === JUDUL === */
+      #main-title {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: white;
+        font-size: 24px;
+        font-weight: 300;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 8px 20px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(4px);
+        pointer-events: none;
+        z-index: 100;
+      }
+
+      /* === UI ATAS (CONTROL & ZOOM) === */
+      #top-ui {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 100;
+        width: 180px;
+      }
+
+      .button-row {
+        display: flex;
+        gap: 5px;
+      }
+
+      button {
+        padding: 10px 15px;
+        font-size: 13px;
+        background: rgba(30, 30, 30, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 6px;
+        color: #ddd;
+        cursor: pointer;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s ease;
+        flex: 1;
+      }
+      button:hover,
+      button.active {
+        background: rgba(255, 255, 255, 0.9);
+        color: #000;
+        border-color: white;
+        font-weight: bold;
+      }
+
+      #toggle-audio {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .zoom-btn {
+        font-size: 18px;
+        font-weight: bold;
+        padding: 5px 0;
+      }
+
+      /* === MENU LAYER (KIRI TENGAH) === */
+      #layer-menu {
+        position: absolute;
+        top: 460px;
+        left: 20px;
+        width: 180px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 100;
+      }
+
+      .layer-btn {
+        text-align: left;
+        border-left: 4px solid transparent;
+      }
+
+      #btn-all {
+        border-left-color: white;
+      }
+      #btn-crust {
+        border-left-color: #5c4033;
+      }
+      #btn-mantle {
+        border-left-color: #cc5500;
+      }
+      #btn-outer {
+        border-left-color: #ff9900;
+      }
+      #btn-inner {
+        border-left-color: #ffdd77;
+      }
+
+      .layer-btn.active {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 1px solid white;
+      }
+      #btn-crust.active {
+        border-left: 4px solid #5c4033;
+      }
+      #btn-mantle.active {
+        border-left: 4px solid #cc5500;
+      }
+      #btn-outer.active {
+        border-left: 4px solid #ff9900;
+      }
+      #btn-inner.active {
+        border-left: 4px solid #ffdd77;
+      }
+
+      /* === PANEL DATA TEKNIS (KANAN) === */
+      #technical-panel {
+        position: absolute;
+        right: 20px;
+        top: 100px;
+        width: 340px;
+        background: rgba(10, 10, 15, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 20px;
+        color: white;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        z-index: 120;
+        display: none;
+      }
+
+      #technical-panel.show {
+        display: block;
+        animation: slideIn 0.4s ease-out;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
         }
-
-        canvas { display: block; }
-
-        /* === JUDUL === */
-        #main-title {
-            position: absolute;
-            top: 20px; left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            font-size: 24px;
-            font-weight: 300;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 8px 20px;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
-            backdrop-filter: blur(4px);
-            pointer-events: none; 
-            z-index: 100;
+        to {
+          opacity: 1;
+          transform: translateY(0);
         }
-        
-        /* === UI ATAS (CONTROL & ZOOM) === */
-        #top-ui {
-            position: absolute; 
-            top: 20px; left: 20px;
-            display: flex; 
-            flex-direction: column; 
-            gap: 8px;
-            z-index: 100;
-            width: 180px;
+      }
+
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .panel-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #ffcc00;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .close-panel {
+        cursor: pointer;
+        font-size: 18px;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+      }
+      .close-panel:hover {
+        opacity: 1;
+      }
+
+      .data-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .data-row:last-child {
+        border-bottom: none;
+      }
+
+      .data-label {
+        font-size: 13px;
+        color: #aaa;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .data-icon {
+        font-size: 18px;
+      }
+
+      .data-value {
+        font-size: 18px;
+        font-weight: 600;
+        color: #fff;
+        text-align: right;
+        min-width: 120px;
+      }
+
+      .data-unit {
+        font-size: 12px;
+        color: #888;
+        margin-left: 4px;
+      }
+
+      .composition-list {
+        margin-top: 10px;
+        font-size: 12px;
+        color: #bbb;
+        line-height: 1.6;
+      }
+
+      .highlight-value {
+        color: #ffcc00;
+        font-weight: 700;
+      }
+
+      /* === PANEL PERBANDINGAN SKALA (BAWAH TENGAH) === */
+      #scale-comparison {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 700px;
+        background: rgba(10, 10, 15, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 20px;
+        color: white;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        z-index: 120;
+        display: none;
+      }
+
+      #scale-comparison.show {
+        display: block;
+        animation: slideUp 0.4s ease-out;
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(30px);
         }
-
-        .button-row {
-            display: flex;
-            gap: 5px;
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
         }
+      }
 
-        button {
-            padding: 10px 15px; 
-            font-size: 13px;
-            background: rgba(30, 30, 30, 0.7);
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 6px;
-            color: #ddd; 
-            cursor: pointer;
-            backdrop-filter: blur(5px);
-            transition: all 0.2s ease;
-            flex: 1;
+      .scale-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .scale-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #ffcc00;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .close-scale {
+        cursor: pointer;
+        font-size: 18px;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+      }
+      .close-scale:hover {
+        opacity: 1;
+      }
+
+      .scale-bars-container {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-around;
+        height: 180px;
+        gap: 15px;
+        margin-bottom: 15px;
+        margin-top: 10px;
+      }
+
+      .scale-bar-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .scale-bar {
+        width: 100%;
+        max-width: 120px;
+        background: linear-gradient(
+          to top,
+          var(--bar-color),
+          var(--bar-color-light)
+        );
+        border-radius: 6px 6px 0 0;
+        position: relative;
+        transition: all 0.6s ease-out;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+      }
+
+      .scale-bar:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 -5px 20px rgba(255, 255, 255, 0.2);
+      }
+
+      .bar-value {
+        position: absolute;
+        top: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 14px;
+        font-weight: 700;
+        color: white;
+        white-space: nowrap;
+      }
+
+      .bar-label {
+        font-size: 13px;
+        color: #ddd;
+        text-align: center;
+        font-weight: 500;
+      }
+
+      .scale-info {
+        text-align: center;
+        font-size: 12px;
+        color: #888;
+        margin-top: 10px;
+      }
+
+      /* Warna untuk setiap bar */
+      .bar-crust {
+        --bar-color: #5c4033;
+        --bar-color-light: #8b6f47;
+      }
+      .bar-mantle {
+        --bar-color: #cc5500;
+        --bar-color-light: #ff6b35;
+      }
+      .bar-outer {
+        --bar-color: #ff9900;
+        --bar-color-light: #ffb347;
+      }
+      .bar-inner {
+        --bar-color: #ffdd77;
+        --bar-color-light: #fff4a3;
+      }
+
+      /* === PANEL ANIMASI FENOMENA (KIRI BAWAH) === */
+      #phenomena-panel {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        width: 280px;
+        background: rgba(10, 10, 15, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 20px;
+        color: white;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        z-index: 120;
+        display: none;
+      }
+
+      #phenomena-panel.show {
+        display: block;
+        animation: slideInLeft 0.4s ease-out;
+      }
+
+      @keyframes slideInLeft {
+        from {
+          opacity: 0;
+          transform: translateX(-30px);
         }
-        button:hover, button.active {
-            background: rgba(255,255,255, 0.9); 
-            color: #000;
-            border-color: white;
-            font-weight: bold;
+        to {
+          opacity: 1;
+          transform: translateX(0);
         }
+      }
 
-        /* Tombol Mute Khusus */
-        #toggle-audio {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
+      .phenomena-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .phenomena-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #ffcc00;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .close-phenomena {
+        cursor: pointer;
+        font-size: 18px;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+      }
+      .close-phenomena:hover {
+        opacity: 1;
+      }
+
+      .phenomena-btn {
+        width: 100%;
+        padding: 12px 15px;
+        margin: 8px 0;
+        background: rgba(30, 30, 30, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 6px;
+        color: #ddd;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: left;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .phenomena-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: #ffcc00;
+      }
+
+      .phenomena-btn.active {
+        background: rgba(255, 204, 0, 0.2);
+        border-color: #ffcc00;
+        color: white;
+      }
+
+      .phenomena-icon {
+        font-size: 18px;
+      }
+
+      /* === PANEL EFEK GLOW & PANAS (KANAN BAWAH) === */
+      #glow-panel {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 280px;
+        background: rgba(10, 10, 15, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 20px;
+        color: white;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        z-index: 120;
+        display: none;
+      }
+
+      #glow-panel.show {
+        display: block;
+        animation: slideInRight 0.4s ease-out;
+      }
+
+      @keyframes slideInRight {
+        from {
+          opacity: 0;
+          transform: translateX(30px);
         }
-
-        /* Tombol Zoom lebih kecil di baris kedua */
-        .zoom-btn {
-            font-size: 18px;
-            font-weight: bold;
-            padding: 5px 0;
+        to {
+          opacity: 1;
+          transform: translateX(0);
         }
+      }
 
-        /* === MENU LAYER (KIRI TENGAH) === */
-        #layer-menu {
-            position: absolute;
-            top: 200px; /* Turun sedikit karena ada tombol mute */
-            left: 20px;
-            width: 180px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            z-index: 100;
+      .glow-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .glow-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #ffcc00;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .close-glow {
+        cursor: pointer;
+        font-size: 18px;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+      }
+      .close-glow:hover {
+        opacity: 1;
+      }
+
+      .glow-btn {
+        width: 100%;
+        padding: 12px 15px;
+        margin: 8px 0;
+        background: rgba(30, 30, 30, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 6px;
+        color: #ddd;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: left;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .glow-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: #ffcc00;
+      }
+
+      .glow-btn.active {
+        background: rgba(255, 204, 0, 0.2);
+        border-color: #ffcc00;
+        color: white;
+      }
+
+      .glow-icon {
+        font-size: 18px;
+      }
+
+      /* === PANEL TIMELINE GEOLOGI (BAWAH TENGAH) === */
+      #timeline-panel {
+        position: absolute;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 900px;
+        background: rgba(10, 10, 15, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 20px;
+        color: white;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        z-index: 115;
+        display: none;
+      }
+
+      #timeline-panel.show {
+        display: block;
+        animation: slideUpTimeline 0.4s ease-out;
+      }
+
+      @keyframes slideUpTimeline {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(30px);
         }
-
-        .layer-btn {
-            text-align: left;
-            border-left: 4px solid transparent;
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
         }
-        
-        /* Indikator warna untuk setiap tombol layer */
-        #btn-all { border-left-color: white; }
-        #btn-crust { border-left-color: #5c4033; } /* Coklat */
-        #btn-mantle { border-left-color: #cc5500; } /* Merah Bata */
-        #btn-outer { border-left-color: #ff9900; } /* Oranye */
-        #btn-inner { border-left-color: #ffdd77; } /* Kuning */
+      }
 
-        .layer-btn.active {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 1px solid white;
+      .timeline-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .timeline-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #ffcc00;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .close-timeline {
+        cursor: pointer;
+        font-size: 18px;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+      }
+      .close-timeline:hover {
+        opacity: 1;
+      }
+
+      .timeline-slider-container {
+        margin: 20px 0;
+      }
+
+      .timeline-slider {
+        width: 100%;
+        height: 8px;
+        border-radius: 4px;
+        background: linear-gradient(
+          to right,
+          #4a0000,
+          #8b4513,
+          #228b22,
+          #4169e1
+        );
+        outline: none;
+        -webkit-appearance: none;
+      }
+
+      .timeline-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #ffcc00;
+        cursor: pointer;
+        box-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+      }
+
+      .timeline-slider::-moz-range-thumb {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #ffcc00;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+      }
+
+      .timeline-marks {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 10px;
+        font-size: 11px;
+        color: #999;
+      }
+
+      .timeline-mark {
+        text-align: center;
+        flex: 1;
+      }
+
+      .timeline-info-box {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 15px;
+      }
+
+      .timeline-era {
+        font-size: 20px;
+        font-weight: 700;
+        color: #ffcc00;
+        margin-bottom: 8px;
+      }
+
+      .timeline-age {
+        font-size: 14px;
+        color: #aaa;
+        margin-bottom: 12px;
+      }
+
+      .timeline-description {
+        font-size: 13px;
+        line-height: 1.6;
+        color: #ddd;
+      }
+
+      .timeline-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-top: 15px;
+      }
+
+      .timeline-stat {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 10px;
+        border-radius: 6px;
+        text-align: center;
+      }
+
+      .timeline-stat-label {
+        font-size: 11px;
+        color: #999;
+        margin-bottom: 4px;
+      }
+
+      .timeline-stat-value {
+        font-size: 16px;
+        font-weight: 600;
+        color: #ffcc00;
+      }
+
+      /* === DESKRIPSI & TOOLTIP === */
+      #info-label {
+        position: absolute;
+        display: none;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        pointer-events: none;
+        font-size: 12px;
+        z-index: 101;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      #description-box {
+        position: absolute;
+        left: 220px;
+        top: 100px;
+        width: 300px;
+        padding: 20px;
+        color: white;
+        background: rgba(15, 15, 15, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        display: none;
+        z-index: 130;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      #close-desc {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 16px;
+        cursor: pointer;
+        opacity: 0.7;
+      }
+      #close-desc:hover {
+        opacity: 1;
+      }
+
+      h2 {
+        margin-top: 0;
+        font-size: 18px;
+        color: #ffcc00;
+      }
+      p {
+        font-size: 14px;
+        line-height: 1.5;
+        color: #ddd;
+      }
+
+      #quiz-panel {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+        background: rgba(10, 10, 15, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 25px;
+        color: white;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        z-index: 120;
+        display: none;
+      }
+
+      #quiz-panel.show {
+        display: block;
+        animation: slideUp 0.4s ease-out;
+      }
+
+      /* === POSISI KHUSUS UNTUK TOMBOL QUIZ DI BAWAH TENGAH === */
+      #toggle-quiz {
+        position: fixed;
+        bottom: 25px; /* jarak dari bawah layar */
+        left: 50%; /* di tengah horizontal */
+        transform: translateX(-50%);
+        z-index: 150; /* pastikan di atas elemen lain */
+        background: rgba(255, 204, 0, 0.85);
+        color: #000;
+        border: none;
+        border-radius: 30px;
+        padding: 12px 25px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.4);
+        transition: all 0.3s ease;
+      }
+
+      #toggle-quiz:hover {
+        background: #ffcc00;
+        transform: translateX(-50%) scale(1.05);
+      }
+
+      .quiz-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .quiz-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #ffcc00;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .close-quiz {
+        cursor: pointer;
+        font-size: 18px;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+      }
+      .close-quiz:hover {
+        opacity: 1;
+      }
+
+      .quiz-score {
+        text-align: center;
+        font-size: 14px;
+        color: #aaa;
+        margin-bottom: 15px;
+      }
+
+      .quiz-score-value {
+        font-weight: 700;
+        color: #ffcc00;
+        font-size: 16px;
+      }
+
+      .quiz-question {
+        font-size: 15px;
+        font-weight: 600;
+        color: white;
+        margin-bottom: 20px;
+        line-height: 1.6;
+        text-align: center;
+      }
+
+      .quiz-options {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .quiz-option {
+        background: rgba(30, 30, 30, 0.7);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        padding: 15px;
+        color: #ddd;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: left;
+        font-size: 14px;
+        position: relative;
+      }
+
+      .quiz-option:hover:not(.disabled) {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: #ffcc00;
+        transform: translateX(5px);
+      }
+
+      .quiz-option.selected {
+        background: rgba(255, 204, 0, 0.2);
+        border-color: #ffcc00;
+      }
+
+      .quiz-option.correct {
+        background: rgba(0, 255, 0, 0.2);
+        border-color: #00ff00;
+        animation: correctPulse 0.5s ease;
+      }
+
+      .quiz-option.wrong {
+        background: rgba(255, 0, 0, 0.2);
+        border-color: #ff0000;
+        animation: wrongShake 0.5s ease;
+      }
+
+      .quiz-option.disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+
+      @keyframes correctPulse {
+        0%,
+        100% {
+          transform: scale(1);
         }
-        #btn-crust.active { border-left: 4px solid #5c4033; }
-        #btn-mantle.active { border-left: 4px solid #cc5500; }
-        #btn-outer.active { border-left: 4px solid #ff9900; }
-        #btn-inner.active { border-left: 4px solid #ffdd77; }
-
-
-        /* === DESKRIPSI & TOOLTIP === */
-        #info-label {
-            position: absolute; 
-            display: none;
-            background: rgba(0, 0, 0, 0.8);
-            color: white; 
-            padding: 5px 10px;
-            border-radius: 4px;
-            pointer-events: none; 
-            font-size: 12px;
-            z-index: 101;
-            border: 1px solid rgba(255,255,255,0.2);
+        50% {
+          transform: scale(1.05);
         }
-        
-        #description-box {
-            position: absolute;
-            right: 20px;
-            top: 100px;
-            width: 280px;
-            padding: 20px;
-            color: white;
-            background: rgba(15, 15, 15, 0.85);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-            display: none;
-            z-index: 130;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      }
+
+      @keyframes wrongShake {
+        0%,
+        100% {
+          transform: translateX(0);
         }
-
-        #close-desc {
-            position: absolute;
-            top: 10px; right: 15px;
-            font-size: 16px;
-            cursor: pointer;
-            opacity: 0.7;
+        25% {
+          transform: translateX(-10px);
         }
-        #close-desc:hover { opacity: 1; }
-        
-        h2 { margin-top: 0; font-size: 18px; color: #ffcc00; }
-        p { font-size: 14px; line-height: 1.5; color: #ddd; }
+        75% {
+          transform: translateX(10px);
+        }
+      }
 
-        </style>
-    </head>
+      .quiz-feedback {
+        text-align: center;
+        font-size: 14px;
+        line-height: 1.6;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        display: none;
+      }
 
-    <body>
+      .quiz-feedback.show {
+        display: block;
+      }
 
-        <div id="main-title">Visualisasi Lapisan Bumi</div>
+      .quiz-feedback.correct {
+        background: rgba(0, 255, 0, 0.1);
+        border: 1px solid rgba(0, 255, 0, 0.3);
+        color: #00ff88;
+      }
 
-        <div id="top-ui">
-            <button id="toggle-audio">🔊 Voice Over: ON</button>
-            <button id="toggle-transparency">Buat Transparan</button>
-            <button id="toggle-clipping">Toggle Irisan</button>
-            
-            <div class="button-row">
-                <button id="zoom-in" class="zoom-btn" title="Zoom In">+</button>
-                <button id="zoom-out" class="zoom-btn" title="Zoom Out">−</button>
-            </div>
+      .quiz-feedback.wrong {
+        background: rgba(255, 0, 0, 0.1);
+        border: 1px solid rgba(255, 0, 0, 0.3);
+        color: #ff8888;
+      }
+
+      .quiz-controls {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+      }
+
+      .quiz-btn {
+        padding: 12px 25px;
+        font-size: 14px;
+        background: rgba(30, 30, 30, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 6px;
+        color: #ddd;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-weight: 500;
+      }
+
+      .quiz-btn:hover {
+        background: rgba(255, 255, 255, 0.9);
+        color: #000;
+        border-color: white;
+      }
+
+      .quiz-btn.primary {
+        background: rgba(255, 204, 0, 0.3);
+        border-color: #ffcc00;
+        color: #ffcc00;
+      }
+
+      .quiz-btn.primary:hover {
+        background: #ffcc00;
+        color: #000;
+      }
+
+      .quiz-progress {
+        text-align: center;
+        font-size: 12px;
+        color: #888;
+        margin-top: 15px;
+      }
+
+      .quiz-complete {
+        text-align: center;
+        display: none;
+      }
+
+      .quiz-complete.show {
+        display: block;
+      }
+
+      .quiz-complete-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: #ffcc00;
+        margin-bottom: 15px;
+      }
+
+      .quiz-complete-score {
+        font-size: 48px;
+        font-weight: 700;
+        color: #00ff88;
+        margin-bottom: 10px;
+      }
+
+      .quiz-complete-message {
+        font-size: 16px;
+        color: #ddd;
+        margin-bottom: 25px;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="main-title">Visualisasi Lapisan Bumi</div>
+
+    <div id="top-ui">
+      <button id="toggle-audio">🔊 Voice Over: ON</button>
+      <button id="toggle-transparency">Buat Transparan</button>
+      <button id="toggle-clipping">Toggle Irisan</button>
+      <button id="toggle-scale">📊 Perbandingan Skala</button>
+      <button id="toggle-phenomena">🌋 Fenomena Geologi</button>
+      <button id="toggle-daynight">☀️ Mode Siang</button>
+      <button id="toggle-glow">🔥 Efek Glow & Panas</button>
+      <button id="toggle-timeline">⏳ Timeline Geologi</button>
+      <button id="toggle-quiz">🎓 Quiz Interaktif</button>
+
+      <div class="button-row">
+        <button id="zoom-in" class="zoom-btn" title="Zoom In">+</button>
+        <button id="zoom-out" class="zoom-btn" title="Zoom Out">−</button>
+      </div>
+    </div>
+
+    <div id="layer-menu">
+      <button
+        id="btn-all"
+        class="layer-btn active"
+        onclick="switchLayer('all')"
+      >
+        Tampilkan Semua
+      </button>
+      <button
+        id="btn-crust"
+        class="layer-btn"
+        onclick="switchLayer('Crust (Kerak Bumi)')"
+      >
+        Kerak Bumi
+      </button>
+      <button
+        id="btn-mantle"
+        class="layer-btn"
+        onclick="switchLayer('Mantle (Mantel)')"
+      >
+        Mantel
+      </button>
+      <button
+        id="btn-outer"
+        class="layer-btn"
+        onclick="switchLayer('Outer Core (Inti Luar)')"
+      >
+        Inti Luar
+      </button>
+      <button
+        id="btn-inner"
+        class="layer-btn"
+        onclick="switchLayer('Inner Core (Inti Dalam)')"
+      >
+        Inti Dalam
+      </button>
+    </div>
+
+    <div id="info-label"></div>
+
+    <div id="description-box">
+      <span id="close-desc">✖</span>
+      <h2 id="desc-title">Judul</h2>
+      <p id="desc-text">Isi deskripsi...</p>
+    </div>
+
+    <!-- PANEL DATA TEKNIS -->
+    <div id="technical-panel">
+      <div class="panel-header">
+        <div class="panel-title" id="panel-layer-name">Data Teknis</div>
+        <span class="close-panel" id="close-panel">✖</span>
+      </div>
+
+      <div class="data-row">
+        <div class="data-label">
+          <span class="data-icon">🌡️</span>
+          <span>Suhu</span>
+        </div>
+        <div class="data-value">
+          <span id="temp-value">0</span><span class="data-unit">°C</span>
+        </div>
+      </div>
+
+      <div class="data-row">
+        <div class="data-label">
+          <span class="data-icon">⚡</span>
+          <span>Tekanan</span>
+        </div>
+        <div class="data-value">
+          <span id="pressure-value">0</span><span class="data-unit">GPa</span>
+        </div>
+      </div>
+
+      <div class="data-row">
+        <div class="data-label">
+          <span class="data-icon">📏</span>
+          <span>Kedalaman</span>
+        </div>
+        <div class="data-value">
+          <span id="depth-value">0</span><span class="data-unit">km</span>
+        </div>
+      </div>
+
+      <div class="data-row">
+        <div class="data-label">
+          <span class="data-icon">🧪</span>
+          <span>Ketebalan</span>
+        </div>
+        <div class="data-value">
+          <span id="thickness-value">0</span><span class="data-unit">km</span>
+        </div>
+      </div>
+
+      <div class="data-row">
+        <div class="data-label">
+          <span class="data-icon">⚛️</span>
+          <span>Komposisi</span>
+        </div>
+      </div>
+      <div class="composition-list" id="composition-text">Loading...</div>
+    </div>
+
+    <!-- PANEL FENOMENA GEOLOGI -->
+    <div id="phenomena-panel">
+      <div class="phenomena-header">
+        <div class="phenomena-title">🌋 Fenomena Geologi</div>
+        <span class="close-phenomena" id="close-phenomena">✖</span>
+      </div>
+
+      <button class="phenomena-btn" id="btn-seismic">
+        <span class="phenomena-icon">📡</span>
+        <span>Gelombang Seismik</span>
+      </button>
+
+      <button class="phenomena-btn" id="btn-convection">
+        <span class="phenomena-icon">🌊</span>
+        <span>Arus Konveksi Mantel</span>
+      </button>
+
+      <button class="phenomena-btn" id="btn-magnetic">
+        <span class="phenomena-icon">🧲</span>
+        <span>Medan Magnet</span>
+      </button>
+
+      <button class="phenomena-btn" id="btn-stop-all">
+        <span class="phenomena-icon">⏹️</span>
+        <span>Stop Semua Animasi</span>
+      </button>
+    </div>
+
+    <!-- PANEL TIMELINE GEOLOGI -->
+    <div id="timeline-panel">
+      <div class="timeline-header">
+        <div class="timeline-title">⏳ Timeline Evolusi Bumi</div>
+        <span class="close-timeline" id="close-timeline">✖</span>
+      </div>
+
+      <div class="timeline-slider-container">
+        <input
+          type="range"
+          min="0"
+          max="8"
+          value="8"
+          step="1"
+          class="timeline-slider"
+          id="timeline-slider"
+        />
+        <div class="timeline-marks">
+          <div class="timeline-mark">4.6 Ga</div>
+          <div class="timeline-mark">4.0 Ga</div>
+          <div class="timeline-mark">3.5 Ga</div>
+          <div class="timeline-mark">2.5 Ga</div>
+          <div class="timeline-mark">1.0 Ga</div>
+          <div class="timeline-mark">500 Ma</div>
+          <div class="timeline-mark">250 Ma</div>
+          <div class="timeline-mark">65 Ma</div>
+          <div class="timeline-mark">Sekarang</div>
+        </div>
+      </div>
+
+      <div class="timeline-info-box">
+        <div class="timeline-era" id="timeline-era">Era Modern (Holosen)</div>
+        <div class="timeline-age" id="timeline-age">
+          0 - 11,700 tahun yang lalu
+        </div>
+        <div class="timeline-description" id="timeline-description">
+          Bumi modern dengan iklim stabil. Manusia berkembang pesat, membangun
+          peradaban. Suhu rata-rata 15°C, atmosfer 21% oksigen. Biodiversitas
+          tinggi dengan 8.7 juta spesies.
         </div>
 
-        <div id="layer-menu">
-            <button id="btn-all" class="layer-btn active" onclick="switchLayer('all')">Tampilkan Semua</button>
-            <button id="btn-crust" class="layer-btn" onclick="switchLayer('Crust (Kerak Bumi)')">Kerak Bumi</button>
-            <button id="btn-mantle" class="layer-btn" onclick="switchLayer('Mantle (Mantel)')">Mantel</button>
-            <button id="btn-outer" class="layer-btn" onclick="switchLayer('Outer Core (Inti Luar)')">Inti Luar</button>
-            <button id="btn-inner" class="layer-btn" onclick="switchLayer('Inner Core (Inti Dalam)')">Inti Dalam</button>
+        <div class="timeline-stats">
+          <div class="timeline-stat">
+            <div class="timeline-stat-label">Suhu Rata-rata</div>
+            <div class="timeline-stat-value" id="timeline-temp">15°C</div>
+          </div>
+          <div class="timeline-stat">
+            <div class="timeline-stat-label">Oksigen (O₂)</div>
+            <div class="timeline-stat-value" id="timeline-oxygen">21%</div>
+          </div>
+          <div class="timeline-stat">
+            <div class="timeline-stat-label">Aktivitas Vulkanik</div>
+            <div class="timeline-stat-value" id="timeline-volcanic">Sedang</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL EFEK GLOW & PANAS -->
+    <div id="glow-panel">
+      <div class="glow-header">
+        <div class="glow-title">🔥 Efek Glow & Panas</div>
+        <span class="close-glow" id="close-glow">✖</span>
+      </div>
+
+      <button class="glow-btn" id="btn-inner-glow">
+        <span class="glow-icon">💛</span>
+        <span>Inner Core Glow</span>
+      </button>
+
+      <button class="glow-btn" id="btn-outer-glow">
+        <span class="glow-icon">🟠</span>
+        <span>Outer Core Glow</span>
+      </button>
+
+      <button class="glow-btn" id="btn-mantle-heat">
+        <span class="glow-icon">🔴</span>
+        <span>Mantle Heat Distortion</span>
+      </button>
+
+      <button class="glow-btn" id="btn-all-glow">
+        <span class="glow-icon">✨</span>
+        <span>Semua Efek</span>
+      </button>
+
+      <button class="glow-btn" id="btn-stop-glow">
+        <span class="glow-icon">⏹️</span>
+        <span>Matikan Efek</span>
+      </button>
+    </div>
+
+    <!-- PANEL PERBANDINGAN SKALA -->
+    <div id="scale-comparison">
+      <div class="scale-header">
+        <div class="scale-title">⚖️ Perbandingan Ketebalan Lapisan Bumi</div>
+        <span class="close-scale" id="close-scale">✖</span>
+      </div>
+
+      <div class="scale-bars-container">
+        <div class="scale-bar-wrapper">
+          <div class="scale-bar bar-crust" id="bar-crust" style="height: 0px">
+            <div class="bar-value">35 km</div>
+          </div>
+          <div class="bar-label">Kerak Bumi</div>
         </div>
 
-        <div id="info-label"></div>
-
-        <div id="description-box">
-            <span id="close-desc">✖</span> 
-            <h2 id="desc-title">Judul</h2>
-            <p id="desc-text">Isi deskripsi...</p>
+        <div class="scale-bar-wrapper">
+          <div class="scale-bar bar-mantle" id="bar-mantle" style="height: 0px">
+            <div class="bar-value">2,865 km</div>
+          </div>
+          <div class="bar-label">Mantel</div>
         </div>
+
+        <div class="scale-bar-wrapper">
+          <div class="scale-bar bar-outer" id="bar-outer" style="height: 0px">
+            <div class="bar-value">2,400 km</div>
+          </div>
+          <div class="bar-label">Inti Luar</div>
+        </div>
+
+        <div class="scale-bar-wrapper">
+          <div class="scale-bar bar-inner" id="bar-inner" style="height: 0px">
+            <div class="bar-value">1,221 km</div>
+          </div>
+          <div class="bar-label">Inti Dalam</div>
+        </div>
+      </div>
+
+      <div class="scale-info">
+        💡 Diagram menunjukkan perbandingan proporsional ketebalan setiap
+        lapisan Bumi
+      </div>
+    </div>
+
+    <!-- PANEL QUIZ INTERAKTIF -->
+    <div id="quiz-panel">
+      <div class="quiz-header">
+        <div class="quiz-title">🎓 Quiz Lapisan Bumi</div>
+        <span class="close-quiz" id="close-quiz">✖</span>
+      </div>
+
+      <div class="quiz-score">
+        Skor: <span class="quiz-score-value" id="quiz-score">0</span> /
+        <span id="quiz-total">10</span>
+      </div>
+
+      <!-- Area Soal Quiz -->
+      <div id="quiz-content">
+        <div class="quiz-question" id="quiz-question">Loading...</div>
+
+        <div class="quiz-options" id="quiz-options">
+          <!-- Options akan di-generate oleh JavaScript -->
+        </div>
+
+        <div class="quiz-feedback" id="quiz-feedback"></div>
+
+        <div class="quiz-controls">
+          <button class="quiz-btn" id="quiz-check" style="display: none">
+            Cek Jawaban
+          </button>
+          <button class="quiz-btn primary" id="quiz-next" style="display: none">
+            Soal Berikutnya
+          </button>
+        </div>
+
+        <div class="quiz-progress" id="quiz-progress">Soal 1 dari 10</div>
+      </div>
+
+      <!-- Area Selesai Quiz -->
+      <div class="quiz-complete" id="quiz-complete">
+        <div class="quiz-complete-title">🎉 Quiz Selesai!</div>
+        <div class="quiz-complete-score" id="final-score">0/10</div>
+        <div class="quiz-complete-message" id="final-message">
+          Bagus sekali!
+        </div>
+
+        <div class="quiz-controls">
+          <button class="quiz-btn primary" id="quiz-restart">
+            Ulangi Quiz
+          </button>
+          <button class="quiz-btn" id="quiz-close">Tutup</button>
+        </div>
+      </div>
+    </div>
 
     <script type="importmap">
-    {
+      {
         "imports": {
-            "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+          "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
         }
-    }
+      }
     </script>
 
     <script type="module">
-    import * as THREE from "three";
-    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-    let isTransparent = false;
-    let isClipped = false;
-    let isHoveringUI = false;
-    let currentActiveLayer = 'all'; 
+      let isTransparent = false;
+      let isClipped = false;
+      let isHoveringUI = false;
+      let currentActiveLayer = "all";
 
-    let isMuted = false;
-    let currentAudio = null; 
+      let isMuted = false;
+      let currentAudio = null;
 
-    //KONFIGURASI AUDIO FILES
-    const audioFiles = {
+      // ANIMASI FENOMENA
+      let seismicWaves = [];
+      let convectionParticles = null;
+      let magneticField = null;
+      let activeAnimations = {
+        seismic: false,
+        convection: false,
+        magnetic: false,
+      };
+
+      // MODE SIANG/MALAM
+      let isDayMode = true;
+      let cityLights = null;
+      let nightShade = null;
+      let isRotating = true; // Kontrol rotasi bumi
+      let terminatorLine = null; // Garis pemisah siang-malam
+      let twilightGlow = null; // Efek glow di zona twilight
+
+      // EFEK GLOW & PANAS
+      let innerCoreGlow = null;
+      let outerCoreGlow = null;
+      let mantleHeatWaves = null;
+      let activeGlowEffects = {
+        innerGlow: false,
+        outerGlow: false,
+        mantleHeat: false,
+      };
+
+      // TIMELINE GEOLOGI
+      const geologicalTimeline = [
+        {
+          index: 0,
+          era: "Pembentukan Bumi (Hadean)",
+          age: "4.6 - 4.0 miliar tahun lalu",
+          description:
+            "Bumi baru terbentuk dari piringan protoplanet. Permukaan masih cair (lava ocean). Suhu ekstrem 2000°C+. Tidak ada atmosfer stabil. Bulan terbentuk dari tabrakan dengan Theia.",
+          temp: "2000°C+",
+          oxygen: "0%",
+          volcanic: "Ekstrem",
+          crustColor: 0xff4400, // Merah menyala
+          mantleEmissive: 0.8,
+          innerEmissive: 1.0,
+        },
+        {
+          index: 1,
+          era: "Awal Kehidupan (Archean Awal)",
+          age: "4.0 - 3.5 miliar tahun lalu",
+          description:
+            "Kerak bumi mulai padat. Samudra pertama terbentuk. Atmosfer purba (CO₂, N₂, CH₄). Suhu masih sangat panas 80-100°C. Aktivitas vulkanik sangat tinggi. Belum ada oksigen.",
+          temp: "80-100°C",
+          oxygen: "0%",
+          volcanic: "Sangat Tinggi",
+          crustColor: 0x884400,
+          mantleEmissive: 0.6,
+          innerEmissive: 0.9,
+        },
+        {
+          index: 2,
+          era: "Bakteria Pertama (Archean Akhir)",
+          age: "3.5 - 2.5 miliar tahun lalu",
+          description:
+            "Kehidupan pertama muncul! Cyanobacteria mulai fotosintesis. Stromatolit terbentuk. Suhu menurun ke 50-70°C. Atmosfer mulai berubah (sedikit O₂). Aktivitas vulkanik masih tinggi.",
+          temp: "50-70°C",
+          oxygen: "0.1%",
+          volcanic: "Tinggi",
+          crustColor: 0x665533,
+          mantleEmissive: 0.5,
+          innerEmissive: 0.8,
+        },
+        {
+          index: 3,
+          era: "Oksigenasi Besar (Proterozoic)",
+          age: "2.5 - 1.0 miliar tahun lalu",
+          description:
+            "Great Oxidation Event! Oksigen meningkat drastis dari fotosintesis. Besi di lautan teroksidasi (Banded Iron Formations). Suhu turun 30-50°C. Kehidupan kompleks mulai berkembang.",
+          temp: "30-50°C",
+          oxygen: "1-10%",
+          volcanic: "Sedang-Tinggi",
+          crustColor: 0x556644,
+          mantleEmissive: 0.4,
+          innerEmissive: 0.7,
+        },
+        {
+          index: 4,
+          era: "Snowball Earth (Neoproterozoic)",
+          age: "1.0 - 0.5 miliar tahun lalu",
+          description:
+            "Bumi membeku total (Snowball Earth episodes). Es menutupi hampir seluruh planet. Suhu -50 hingga 0°C. Oksigen mencapai 10%. Kehidupan multiseluler muncul. Superbenua Rodinia pecah.",
+          temp: "-50 to 0°C",
+          oxygen: "10%",
+          volcanic: "Sedang",
+          crustColor: 0xccddff,
+          mantleEmissive: 0.3,
+          innerEmissive: 0.6,
+        },
+        {
+          index: 5,
+          era: "Ledakan Kambrium (Paleozoic)",
+          age: "500 - 250 juta tahun lalu",
+          description:
+            "Cambrian Explosion! Kehidupan meledak dengan keanekaragaman. Hewan laut kompleks muncul. Tanaman darat pertama. Oksigen 15%. Suhu hangat 20-25°C. Superbenua Pangea terbentuk.",
+          temp: "20-25°C",
+          oxygen: "15%",
+          volcanic: "Sedang",
+          crustColor: 0x447733,
+          mantleEmissive: 0.3,
+          innerEmissive: 0.6,
+        },
+        {
+          index: 6,
+          era: "Era Dinosaurus (Mesozoic)",
+          age: "250 - 65 juta tahun lalu",
+          description:
+            "Zaman Dinosaurus! Reptil raksasa menguasai Bumi. Oksigen naik ke 20%. Suhu hangat 18-22°C. Pangea pecah menjadi benua-benua modern. Aktivitas vulkanik sedang. Flora dan fauna beragam.",
+          temp: "18-22°C",
+          oxygen: "20%",
+          volcanic: "Sedang",
+          crustColor: 0x558844,
+          mantleEmissive: 0.25,
+          innerEmissive: 0.6,
+        },
+        {
+          index: 7,
+          era: "Kepunahan Dinosaurus",
+          age: "65 juta tahun lalu",
+          description:
+            "Asteroid Chicxulub menabrak Bumi! Dinosaurus punah. Debu menutupi atmosfer (nuclear winter). Suhu turun drastis. 75% spesies punah. Mamalia mulai berkembang. Era baru dimulai.",
+          temp: "10-15°C",
+          oxygen: "21%",
+          volcanic: "Sangat Tinggi",
+          crustColor: 0x665544,
+          mantleEmissive: 0.4,
+          innerEmissive: 0.65,
+        },
+        {
+          index: 8,
+          era: "Era Modern (Holosen)",
+          age: "0 - 11,700 tahun yang lalu",
+          description:
+            "Bumi modern dengan iklim stabil. Manusia berkembang pesat, membangun peradaban. Suhu rata-rata 15°C, atmosfer 21% oksigen. Biodiversitas tinggi dengan 8.7 juta spesies.",
+          temp: "15°C",
+          oxygen: "21%",
+          volcanic: "Sedang",
+          crustColor: 0x447733,
+          mantleEmissive: 0.2,
+          innerEmissive: 0.6,
+        },
+      ];
+
+      // DATA TEKNIS UNTUK SETIAP LAPISAN
+      const technicalData = {
+        "Crust (Kerak Bumi)": {
+          temperature: { min: 0, max: 400, avg: 200 },
+          pressure: { min: 0, max: 1, avg: 0.5 },
+          depth: { start: 0, end: 35 },
+          thickness: 35,
+          composition: [
+            { name: "Oksigen", percent: 46 },
+            { name: "Silikon", percent: 28 },
+            { name: "Aluminium", percent: 8 },
+            { name: "Besi", percent: 5 },
+            { name: "Kalsium", percent: 4 },
+            { name: "Lainnya", percent: 9 },
+          ],
+        },
+        "Mantle (Mantel)": {
+          temperature: { min: 500, max: 4000, avg: 2200 },
+          pressure: { min: 1, max: 136, avg: 68 },
+          depth: { start: 35, end: 2900 },
+          thickness: 2865,
+          composition: [
+            { name: "Silikat (MgSiO₃)", percent: 45 },
+            { name: "Olivin (Mg₂SiO₄)", percent: 40 },
+            { name: "Besi Oksida", percent: 8 },
+            { name: "Kalsium", percent: 4 },
+            { name: "Lainnya", percent: 3 },
+          ],
+        },
+        "Outer Core (Inti Luar)": {
+          temperature: { min: 4000, max: 6000, avg: 5000 },
+          pressure: { min: 136, max: 330, avg: 233 },
+          depth: { start: 2900, end: 5150 },
+          thickness: 2400,
+          composition: [
+            { name: "Besi (Fe)", percent: 80 },
+            { name: "Nikel (Ni)", percent: 15 },
+            { name: "Sulfur", percent: 3 },
+            { name: "Oksigen", percent: 2 },
+          ],
+        },
+        "Inner Core (Inti Dalam)": {
+          temperature: { min: 5200, max: 7000, avg: 6000 },
+          pressure: { min: 330, max: 360, avg: 345 },
+          depth: { start: 5150, end: 6371 },
+          thickness: 1221,
+          composition: [
+            { name: "Besi (Fe)", percent: 85 },
+            { name: "Nikel (Ni)", percent: 10 },
+            { name: "Kristal Padat", percent: 5 },
+          ],
+        },
+      };
+
+      // FUNGSI ANIMASI ANGKA
+      function animateValue(element, start, end, duration, suffix = "") {
+        const range = end - start;
+        const increment = range / (duration / 16);
+        let current = start;
+
+        const timer = setInterval(() => {
+          current += increment;
+          if (
+            (increment > 0 && current >= end) ||
+            (increment < 0 && current <= end)
+          ) {
+            current = end;
+            clearInterval(timer);
+          }
+          element.textContent = Math.round(current).toLocaleString("id-ID");
+        }, 16);
+      }
+
+      // FUNGSI UPDATE PANEL DATA TEKNIS
+      function updateTechnicalPanel(layerName) {
+        const panel = document.getElementById("technical-panel");
+        const data = technicalData[layerName];
+
+        if (!data) {
+          panel.classList.remove("show");
+          return;
+        }
+
+        panel.classList.add("show");
+        document.getElementById("panel-layer-name").textContent = layerName;
+
+        const tempEl = document.getElementById("temp-value");
+        const pressureEl = document.getElementById("pressure-value");
+        const depthEl = document.getElementById("depth-value");
+        const thicknessEl = document.getElementById("thickness-value");
+
+        animateValue(tempEl, 0, data.temperature.avg, 800);
+        animateValue(pressureEl, 0, data.pressure.avg, 800);
+        animateValue(depthEl, 0, data.depth.start, 800);
+        animateValue(thicknessEl, 0, data.thickness, 800);
+
+        const compositionText = document.getElementById("composition-text");
+        let compHTML = "";
+        data.composition.forEach((comp) => {
+          compHTML += `• <span class="highlight-value">${comp.name}</span>: ${comp.percent}%<br>`;
+        });
+        compositionText.innerHTML = compHTML;
+      }
+
+      document.getElementById("close-panel").onclick = () => {
+        document.getElementById("technical-panel").classList.remove("show");
+      };
+
+      const audioFiles = {
         "Crust (Kerak Bumi)": "audio_crust.mp3",
         "Mantle (Mantel)": "audio_mantle.mp3",
         "Outer Core (Inti Luar)": "audio_outer.mp3",
-        "Inner Core (Inti Dalam)": "audio_inner.mp3"
-    };
+        "Inner Core (Inti Dalam)": "audio_inner.mp3",
+      };
 
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    const mousePos = { x: 0, y: 0 };
-    const label = document.getElementById("info-label");
-    const descriptionBox = document.getElementById("description-box");
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+      const mousePos = { x: 0, y: 0 };
+      const label = document.getElementById("info-label");
+      const descriptionBox = document.getElementById("description-box");
 
-    const layerDescriptions = {
-        "Crust (Kerak Bumi)": 
-            "Kerak adalah lapisan terluar Bumi, tempat kita tinggal. Terdiri dari batuan padat dan mineral. Ketebalannya bervariasi: 5-10 km di bawah samudra dan 30-70 km di bawah benua.",
-        "Mantle (Mantel)": 
-            "Mantel adalah lapisan tertebal (sekitar 2.900 km). Terdiri dari batuan silikat semi-padat yang sangat panas. Arus konveksi di sini menggerakkan lempeng tektonik di atasnya.",
-        "Outer Core (Inti Luar)": 
-            "Inti Luar adalah lapisan logam cair (terutama besi dan nikel) setebal 2.400 km. Gerakan fluida di sini menciptakan efek dinamo yang menghasilkan medan magnet Bumi.",
-        "Inner Core (Inti Dalam)": 
-            "Inti Dalam adalah bola besi-nikel padat dengan radius 1.220 km. Meskipun suhunya sepanas permukaan Matahari (5.400°C), tekanan ekstrem membuatnya tetap padat."
-    };
+      const layerDescriptions = {
+        "Crust (Kerak Bumi)":
+          "Kerak adalah lapisan terluar Bumi, tempat kita tinggal. Terdiri dari batuan padat dan mineral. Ketebalannya bervariasi: 5-10 km di bawah samudra dan 30-70 km di bawah benua.",
+        "Mantle (Mantel)":
+          "Mantel adalah lapisan tertebal (sekitar 2.900 km). Terdiri dari batuan silikat semi-padat yang sangat panas. Arus konveksi di sini menggerakkan lempeng tektonik di atasnya.",
+        "Outer Core (Inti Luar)":
+          "Inti Luar adalah lapisan logam cair (terutama besi dan nikel) setebal 2.400 km. Gerakan fluida di sini menciptakan efek dinamo yang menghasilkan medan magnet Bumi.",
+        "Inner Core (Inti Dalam)":
+          "Inti Dalam adalah bola besi-nikel padat dengan radius 1.220 km. Meskipun suhunya sepanas permukaan Matahari (5.400°C), tekanan ekstrem membuatnya tetap padat.",
+      };
 
-    //FUNGSI AUDIO CONTROL
-    function playVoiceOver(layerName) {
+      function playVoiceOver(layerName) {
         if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
         }
 
         if (isMuted) return;
 
         const fileName = audioFiles[layerName];
         if (fileName) {
-            currentAudio = new Audio(fileName);
-            currentAudio.volume = 1.0;
-            currentAudio.play().catch(error => {
-                console.warn("Gagal memutar audio (mungkin file tidak ada):", error);
-            });
+          currentAudio = new Audio(fileName);
+          currentAudio.volume = 1.0;
+          currentAudio.play().catch((error) => {
+            console.warn(
+              "Gagal memutar audio (mungkin file tidak ada):",
+              error
+            );
+          });
         }
-    }
+      }
 
-    function stopAudio() {
+      function stopAudio() {
         if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
         }
-    }
+      }
 
-    //Scene Setup
-    const scene = new THREE.Scene();
-    const capsGroup = new THREE.Group();
-    scene.add(capsGroup);
-    capsGroup.visible = false;
+      const scene = new THREE.Scene();
+      const capsGroup = new THREE.Group();
+      scene.add(capsGroup);
+      capsGroup.visible = false;
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 12;
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.z = 12;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setClearColor(0x000000, 0); 
-    renderer.localClippingEnabled = false;
-    document.body.appendChild(renderer.domElement);
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+      });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setClearColor(0x000000, 0);
+      renderer.localClippingEnabled = false;
+      document.body.appendChild(renderer.domElement);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.enablePan = false;
-    controls.minDistance = 0.1; 
-    controls.maxDistance = 40;
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.enablePan = false;
+      controls.minDistance = 0.1;
+      controls.maxDistance = 40;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    sunLight.position.set(5, 3, 5);
-    scene.add(sunLight);
+      scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+      const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+      sunLight.position.set(5, 3, 5);
+      scene.add(sunLight);
 
-    const clipPlanes = [
+      const clipPlanes = [
         new THREE.Plane(new THREE.Vector3(1, 0, 0), 0),
-        new THREE.Plane(new THREE.Vector3(0, -1, 0), 0) 
-    ];
+        new THREE.Plane(new THREE.Vector3(0, -1, 0), 0),
+      ];
 
-    //Texture Loading
-    const texLoader = new THREE.TextureLoader();
-    const tCrust = texLoader.load("peta_kerak.png"); 
-    const tInner = texLoader.load("inti_dalam.jpg");
-    const tOuter = texLoader.load("inti_luar.jpg");
-    const tMantle = texLoader.load("mantel.jpg");
+      const texLoader = new THREE.TextureLoader();
+      const tCrust = texLoader.load("peta_kerak.png");
+      const tInner = texLoader.load("inti_dalam.jpg");
+      const tOuter = texLoader.load("inti_luar.jpg");
+      const tMantle = texLoader.load("mantel.jpg");
 
-    //Create Layer Function
-    // === Create Layer Function (UPDATED: Double Shell) ===
-    function createLayer(name, radius, texture, color, emissiveColor, solidColor, isInnerMost = false) {
+      function createLayer(
+        name,
+        radius,
+        texture,
+        color,
+        emissiveColor,
+        solidColor,
+        isInnerMost = false
+      ) {
         const group = new THREE.Group();
-        group.userData.name = name; // Simpan nama di grup juga
+        group.userData.name = name;
 
-        // 1. MESH LUAR (Tekstur + FrontSide)
         const geoOuter = new THREE.SphereGeometry(radius, 64, 64);
         const matOuter = new THREE.MeshStandardMaterial({
-            map: texture,
-            color: color,
-            emissive: emissiveColor,
-            emissiveIntensity: 0.2,
-            roughness: 0.5,
-            metalness: 0.1,
-            clippingPlanes: clipPlanes,
-            side: THREE.FrontSide, // Hanya gambar sisi luar
-            transparent: name === "Outer Core (Inti Luar)" ? true : false,
-            opacity: name === "Outer Core (Inti Luar)" ? 0.85 : 1.0
+          map: texture,
+          color: color,
+          emissive: emissiveColor,
+          emissiveIntensity: 0.2,
+          roughness: 0.5,
+          metalness: 0.1,
+          clippingPlanes: clipPlanes,
+          side: THREE.FrontSide,
+          transparent: name === "Outer Core (Inti Luar)" ? true : false,
+          opacity: name === "Outer Core (Inti Luar)" ? 0.85 : 1.0,
         });
         const meshOuter = new THREE.Mesh(geoOuter, matOuter);
-        meshOuter.userData.name = name; // Penting untuk Raycaster
-        
-        // 2. MESH DALAM (Warna Solid + BackSide)
-        const geoInner = new THREE.SphereGeometry(radius - 0.01, 64, 64); // Sedikit lebih kecil agar tidak flickering
+        meshOuter.userData.name = name;
+
+        const geoInner = new THREE.SphereGeometry(radius - 0.01, 64, 64);
         const matInner = new THREE.MeshStandardMaterial({
-            color: solidColor, // Pakai warna solid dari caps
-            roughness: 0.8,
-            clippingPlanes: clipPlanes,
-            side: THREE.BackSide, // Hanya gambar sisi dalam
-            // Ikuti transparansi outer core agar konsisten
-            transparent: name === "Outer Core (Inti Luar)" ? true : false,
-            opacity: name === "Outer Core (Inti Luar)" ? 0.85 : 1.0
+          color: solidColor,
+          roughness: 0.8,
+          clippingPlanes: clipPlanes,
+          side: THREE.BackSide,
+          transparent: name === "Outer Core (Inti Luar)" ? true : false,
+          opacity: name === "Outer Core (Inti Luar)" ? 0.85 : 1.0,
         });
         const meshInner = new THREE.Mesh(geoInner, matInner);
-        meshInner.userData.name = name; // Penting untuk Raycaster
+        meshInner.userData.name = name;
 
-        // Gabungkan keduanya
         group.add(meshOuter);
         group.add(meshInner);
-        
+
         return group;
-    }
+      }
 
-    const inner = createLayer("Inner Core (Inti Dalam)", 1.3, tInner, 0xffffff, 0xffdd77, 0xffdd77, true);
-    inner.children[0].material.emissiveIntensity = 0.6;
+      const inner = createLayer(
+        "Inner Core (Inti Dalam)",
+        1.3,
+        tInner,
+        0xffffff,
+        0xffdd77,
+        0xffdd77,
+        true
+      );
+      inner.children[0].material.emissiveIntensity = 0.6;
 
-    const outer = createLayer("Outer Core (Inti Luar)", 2.2, tOuter, 0xffb347, 0xff7f24, 0xff9900);
-    outer.children[0].material.emissiveIntensity = 0.3;
+      const outer = createLayer(
+        "Outer Core (Inti Luar)",
+        2.2,
+        tOuter,
+        0xffb347,
+        0xff7f24,
+        0xff9900
+      );
+      outer.children[0].material.emissiveIntensity = 0.3;
 
-    const mantle = createLayer("Mantle (Mantel)", 3.0, tMantle, 0xffa64d, 0xcc6600, 0xcc5500);
+      const mantle = createLayer(
+        "Mantle (Mantel)",
+        3.0,
+        tMantle,
+        0xffa64d,
+        0xcc6600,
+        0xcc5500
+      );
 
-    const crust = createLayer("Crust (Kerak Bumi)", 3.3, tCrust, 0xffffff, 0x222222, 0x331100);
-    crust.children[0].material.roughness = 0.8;
+      const crust = createLayer(
+        "Crust (Kerak Bumi)",
+        3.3,
+        tCrust,
+        0xffffff,
+        0x222222,
+        0x331100
+      );
+      crust.children[0].material.roughness = 0.8;
 
-    scene.add(inner, outer, mantle, crust);
-    const layers = [crust, mantle, outer, inner];
+      scene.add(inner, outer, mantle, crust);
+      const layers = [crust, mantle, outer, inner];
 
-    function createAndAttachCap(layerObj, innerR, outerR, colorHex) {
+      function createAndAttachCap(layerObj, innerR, outerR, colorHex) {
         let geo;
         if (innerR === 0) geo = new THREE.CircleGeometry(outerR, 64);
         else geo = new THREE.RingGeometry(innerR, outerR, 64);
 
-        const matH = new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, clippingPlanes: [clipPlanes[0]] });
-        const matV = new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, clippingPlanes: [clipPlanes[1]] });
+        const matH = new THREE.MeshBasicMaterial({
+          color: colorHex,
+          side: THREE.DoubleSide,
+          clippingPlanes: [clipPlanes[0]],
+        });
+        const matV = new THREE.MeshBasicMaterial({
+          color: colorHex,
+          side: THREE.DoubleSide,
+          clippingPlanes: [clipPlanes[1]],
+        });
 
         const capY = new THREE.Mesh(geo, matH);
         capY.rotation.x = -Math.PI / 2;
@@ -381,276 +1885,1958 @@
 
         const group = new THREE.Group();
         group.add(capY, capX);
-        layerObj.userData.capMesh = group; 
+        layerObj.userData.capMesh = group;
         capsGroup.add(group);
-    }
+      }
 
-    createAndAttachCap(inner, 0, 1.3, 0xffdd77);
-    createAndAttachCap(outer, 1.3, 2.2, 0xff9900);
-    createAndAttachCap(mantle, 2.2, 3.0, 0xcc5500);
-    createAndAttachCap(crust, 3.0, 3.3, 0x331100);
+      createAndAttachCap(inner, 0, 1.3, 0xffdd77);
+      createAndAttachCap(outer, 1.3, 2.2, 0xff9900);
+      createAndAttachCap(mantle, 2.2, 3.0, 0xcc5500);
+      createAndAttachCap(crust, 3.0, 3.3, 0x331100);
 
-
-    //LOGIKA GANTI LAYER (MENU)
-    window.switchLayer = function(layerName) {
+      window.switchLayer = function (layerName) {
         currentActiveLayer = layerName;
-        document.querySelectorAll('.layer-btn').forEach(btn => btn.classList.remove('active'));
+        document
+          .querySelectorAll(".layer-btn")
+          .forEach((btn) => btn.classList.remove("active"));
 
-        if (layerName === 'all') {
-            document.getElementById('btn-all').classList.add('active');
-            descriptionBox.style.display = 'none';
-            
+        if (layerName === "all") {
+          document.getElementById("btn-all").classList.add("active");
+          descriptionBox.style.display = "none";
+          document.getElementById("technical-panel").classList.remove("show");
 
-            stopAudio();
+          stopAudio();
 
-            layers.forEach(l => {
-                l.visible = true;
-                if(l.userData.capMesh) l.userData.capMesh.visible = true;
-            });
-        } 
-        else {
+          layers.forEach((l) => {
+            l.visible = true;
+            if (l.userData.capMesh) l.userData.capMesh.visible = true;
+          });
+        } else {
+          playVoiceOver(layerName);
+          updateTechnicalPanel(layerName);
 
-            playVoiceOver(layerName);
+          if (layerName.includes("Crust"))
+            document.getElementById("btn-crust").classList.add("active");
+          if (layerName.includes("Mantle"))
+            document.getElementById("btn-mantle").classList.add("active");
+          if (layerName.includes("Outer"))
+            document.getElementById("btn-outer").classList.add("active");
+          if (layerName.includes("Inner"))
+            document.getElementById("btn-inner").classList.add("active");
 
-            if(layerName.includes("Crust")) document.getElementById('btn-crust').classList.add('active');
-            if(layerName.includes("Mantle")) document.getElementById('btn-mantle').classList.add('active');
-            if(layerName.includes("Outer")) document.getElementById('btn-outer').classList.add('active');
-            if(layerName.includes("Inner")) document.getElementById('btn-inner').classList.add('active');
+          layers.forEach((l) => {
+            if (l.userData.name === layerName) {
+              l.visible = true;
+              if (l.userData.capMesh) l.userData.capMesh.visible = true;
 
-            layers.forEach(l => {
-                if (l.userData.name === layerName) {
-                    l.visible = true;
-                    if(l.userData.capMesh) l.userData.capMesh.visible = true;
-                    
-                    descriptionBox.style.display = "block";
-                    document.getElementById("desc-title").textContent = l.userData.name;
-                    document.getElementById("desc-text").textContent = layerDescriptions[l.userData.name];
-                } else {
-                    l.visible = false;
-                    if(l.userData.capMesh) l.userData.capMesh.visible = false;
-                }
-            });
+              descriptionBox.style.display = "block";
+              document.getElementById("desc-title").textContent =
+                l.userData.name;
+              document.getElementById("desc-text").textContent =
+                layerDescriptions[l.userData.name];
+            } else {
+              l.visible = false;
+              if (l.userData.capMesh) l.userData.capMesh.visible = false;
+            }
+          });
         }
-    };
+      };
 
-    const btnMute = document.getElementById("toggle-audio");
-    btnMute.onclick = () => {
+      const btnMute = document.getElementById("toggle-audio");
+      btnMute.onclick = () => {
         isMuted = !isMuted;
         if (isMuted) {
-            stopAudio();
-            btnMute.textContent = "🔇 Voice Over: OFF";
-            btnMute.style.borderColor = "#ff4444";
-            btnMute.style.color = "#ffaaaa";
+          stopAudio();
+          btnMute.textContent = "🔇 Voice Over: OFF";
+          btnMute.style.borderColor = "#ff4444";
+          btnMute.style.color = "#ffaaaa";
         } else {
-            btnMute.textContent = "🔊 Voice Over: ON";
-            btnMute.style.borderColor = "rgba(255,255,255,0.3)";
-            btnMute.style.color = "#ddd";
+          btnMute.textContent = "🔊 Voice Over: ON";
+          btnMute.style.borderColor = "rgba(255,255,255,0.3)";
+          btnMute.style.color = "#ddd";
         }
-    };
+      };
 
-    document.getElementById("close-desc").onclick = () => {
+      document.getElementById("close-desc").onclick = () => {
         descriptionBox.style.display = "none";
         stopAudio();
-    };
+      };
 
-    // === UI Logic: Tombol Transparansi (UPDATED) ===
-    document.getElementById("toggle-transparency").onclick = () => {
+      document.getElementById("toggle-transparency").onclick = () => {
         isTransparent = !isTransparent;
 
         const setOpacity = (layerGroup, isTransparentFlag, opacityValue) => {
-            const isOuterCoreDefault = layerGroup.userData.name === "Outer Core (Inti Luar)";
-            const defaultOpacity = isOuterCoreDefault ? 0.85 : 1.0;
-            
-            layerGroup.children.forEach(mesh => {
-                // If turning transparency on, set transparent flag and opacity
-                if (isTransparentFlag) {
-                    mesh.material.transparent = true;
-                    mesh.material.opacity = opacityValue;
-                } else { // otherwise, revert to default
-                    mesh.material.transparent = isOuterCoreDefault;
-                    mesh.material.opacity = defaultOpacity;
-                }
-                mesh.material.needsUpdate = true;
-            });
+          const isOuterCoreDefault =
+            layerGroup.userData.name === "Outer Core (Inti Luar)";
+          const defaultOpacity = isOuterCoreDefault ? 0.85 : 1.0;
+
+          layerGroup.children.forEach((mesh) => {
+            if (isTransparentFlag) {
+              mesh.material.transparent = true;
+              mesh.material.opacity = opacityValue;
+            } else {
+              mesh.material.transparent = isOuterCoreDefault;
+              mesh.material.opacity = defaultOpacity;
+            }
+            mesh.material.needsUpdate = true;
+          });
         };
 
         setOpacity(crust, isTransparent, 0.6);
         setOpacity(mantle, isTransparent, 0.5);
         setOpacity(outer, isTransparent, 0.4);
-        
-        document.getElementById("toggle-transparency").textContent =
-            isTransparent ? "Buat Solid" : "Buat Transparan";
-    };
 
-    document.getElementById("toggle-clipping").onclick = () => {
+        document.getElementById("toggle-transparency").textContent =
+          isTransparent ? "Buat Solid" : "Buat Transparan";
+      };
+
+      document.getElementById("toggle-clipping").onclick = () => {
         isClipped = !isClipped;
         renderer.localClippingEnabled = isClipped;
-        capsGroup.visible = isClipped; 
-        document.getElementById("toggle-clipping").textContent =
-            isClipped ? "Tampilkan Penuh" : "Toggle Irisan";
-    };
+        capsGroup.visible = isClipped;
+        document.getElementById("toggle-clipping").textContent = isClipped
+          ? "Tampilkan Penuh"
+          : "Toggle Irisan";
+      };
 
-    const zoomStep = 1.5;
-    function updateZoom(isZoomIn) {
+      const zoomStep = 1.5;
+      function updateZoom(isZoomIn) {
         const currentDist = camera.position.distanceTo(controls.target);
-        let newDist = isZoomIn ? 
-            Math.max(currentDist - zoomStep, controls.minDistance) :
-            Math.min(currentDist + zoomStep, controls.maxDistance);
-        
-        camera.position.setLength(newDist);
-        controls.update(); 
-    }
-    document.getElementById("zoom-in").onclick = () => updateZoom(true);
-    document.getElementById("zoom-out").onclick = () => updateZoom(false);
+        let newDist = isZoomIn
+          ? Math.max(currentDist - zoomStep, controls.minDistance)
+          : Math.min(currentDist + zoomStep, controls.maxDistance);
 
-    window.addEventListener("mousemove", (e)=>{
+        camera.position.setLength(newDist);
+        controls.update();
+      }
+      document.getElementById("zoom-in").onclick = () => updateZoom(true);
+      document.getElementById("zoom-out").onclick = () => updateZoom(false);
+
+      // === SCALE COMPARISON LOGIC ===
+      const scalePanel = document.getElementById("scale-comparison");
+      const btnToggleScale = document.getElementById("toggle-scale");
+      const btnCloseScale = document.getElementById("close-scale");
+
+      const layerThickness = {
+        crust: 35,
+        mantle: 2865,
+        outer: 2400,
+        inner: 1221,
+      };
+
+      const maxHeight = 160;
+      const maxThickness = Math.max(...Object.values(layerThickness));
+
+      function toggleScaleComparison() {
+        const isVisible = scalePanel.classList.contains("show");
+
+        if (isVisible) {
+          scalePanel.classList.remove("show");
+          btnToggleScale.classList.remove("active");
+        } else {
+          scalePanel.classList.add("show");
+          btnToggleScale.classList.add("active");
+
+          setTimeout(() => {
+            animateBars();
+          }, 100);
+        }
+      }
+
+      function animateBars() {
+        const heights = {
+          crust: (layerThickness.crust / maxThickness) * maxHeight,
+          mantle: (layerThickness.mantle / maxThickness) * maxHeight,
+          outer: (layerThickness.outer / maxThickness) * maxHeight,
+          inner: (layerThickness.inner / maxThickness) * maxHeight,
+        };
+
+        document.getElementById("bar-crust").style.height =
+          heights.crust + "px";
+        document.getElementById("bar-mantle").style.height =
+          heights.mantle + "px";
+        document.getElementById("bar-outer").style.height =
+          heights.outer + "px";
+        document.getElementById("bar-inner").style.height =
+          heights.inner + "px";
+      }
+
+      function resetBars() {
+        document.getElementById("bar-crust").style.height = "0px";
+        document.getElementById("bar-mantle").style.height = "0px";
+        document.getElementById("bar-outer").style.height = "0px";
+        document.getElementById("bar-inner").style.height = "0px";
+      }
+
+      btnToggleScale.onclick = toggleScaleComparison;
+
+      btnCloseScale.onclick = () => {
+        scalePanel.classList.remove("show");
+        btnToggleScale.classList.remove("active");
+        setTimeout(resetBars, 400);
+      };
+
+      // === PHENOMENA PANEL LOGIC ===
+      const phenomenaPanel = document.getElementById("phenomena-panel");
+      const btnTogglePhenomena = document.getElementById("toggle-phenomena");
+      const btnClosePhenomena = document.getElementById("close-phenomena");
+
+      btnTogglePhenomena.onclick = () => {
+        const isVisible = phenomenaPanel.classList.contains("show");
+
+        if (isVisible) {
+          phenomenaPanel.classList.remove("show");
+          btnTogglePhenomena.classList.remove("active");
+        } else {
+          phenomenaPanel.classList.add("show");
+          btnTogglePhenomena.classList.add("active");
+        }
+      };
+
+      btnClosePhenomena.onclick = () => {
+        phenomenaPanel.classList.remove("show");
+        btnTogglePhenomena.classList.remove("active");
+      };
+
+      window.addEventListener("mousemove", (e) => {
         mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
         mousePos.x = e.clientX;
         mousePos.y = e.clientY;
-        isHoveringUI = e.target.tagName !== 'CANVAS';
-        if (isHoveringUI) label.style.display = 'none';
-    });
+        isHoveringUI = e.target.tagName !== "CANVAS";
+        if (isHoveringUI) label.style.display = "none";
+      });
 
-    window.addEventListener("click", () => {
+      window.addEventListener("click", () => {
         if (isHoveringUI) return;
-        if (currentActiveLayer !== 'all') return; 
+        if (currentActiveLayer !== "all") return;
 
         raycaster.setFromCamera(mouse, camera);
-        const visibleLayers = layers.filter(l => l.visible);
+        const visibleLayers = layers.filter((l) => l.visible);
         const intersects = raycaster.intersectObjects(visibleLayers);
 
         let foundObj = null;
         for (let i = 0; i < intersects.length; i++) {
-            const hit = intersects[i];
-            if (isClipped) {
-                let isHidden = false;
-                for (const plane of clipPlanes) {
-                    if (plane.distanceToPoint(hit.point) < 0) { isHidden = true; break; }
-                }
-                if (isHidden) continue;
+          const hit = intersects[i];
+          if (isClipped) {
+            let isHidden = false;
+            for (const plane of clipPlanes) {
+              if (plane.distanceToPoint(hit.point) < 0) {
+                isHidden = true;
+                break;
+              }
             }
-            foundObj = hit.object;
-            break; 
+            if (isHidden) continue;
+          }
+          foundObj = hit.object;
+          break;
         }
 
         if (foundObj) {
-             const title = foundObj.userData.name;
-             
-             // Play Audio
-             playVoiceOver(title);
+          const title = foundObj.userData.name;
 
-             descriptionBox.style.display = "block"; 
-             document.getElementById("desc-title").textContent = title;
-             document.getElementById("desc-text").textContent = layerDescriptions[title];
-             
-             document.querySelectorAll('.layer-btn').forEach(btn => btn.classList.remove('active'));
-             if(title.includes("Crust")) document.getElementById('btn-crust').classList.add('active');
-             else if(title.includes("Mantle")) document.getElementById('btn-mantle').classList.add('active');
-             else if(title.includes("Outer")) document.getElementById('btn-outer').classList.add('active');
-             else if(title.includes("Inner")) document.getElementById('btn-inner').classList.add('active');
+          playVoiceOver(title);
+          updateTechnicalPanel(title);
+
+          descriptionBox.style.display = "block";
+          document.getElementById("desc-title").textContent = title;
+          document.getElementById("desc-text").textContent =
+            layerDescriptions[title];
+
+          document
+            .querySelectorAll(".layer-btn")
+            .forEach((btn) => btn.classList.remove("active"));
+          if (title.includes("Crust"))
+            document.getElementById("btn-crust").classList.add("active");
+          else if (title.includes("Mantle"))
+            document.getElementById("btn-mantle").classList.add("active");
+          else if (title.includes("Outer"))
+            document.getElementById("btn-outer").classList.add("active");
+          else if (title.includes("Inner"))
+            document.getElementById("btn-inner").classList.add("active");
         }
-    });
+      });
 
-    function checkHover(){
+      function checkHover() {
         if (isHoveringUI) return;
         raycaster.setFromCamera(mouse, camera);
-        const visibleLayers = layers.filter(l => l.visible);
+        const visibleLayers = layers.filter((l) => l.visible);
         const intersects = raycaster.intersectObjects(visibleLayers);
-        
+
         let foundObj = null;
         for (let i = 0; i < intersects.length; i++) {
-            const hit = intersects[i];
-            if (isClipped) {
-                let isHidden = false;
-                for (const plane of clipPlanes) {
-                    if (plane.distanceToPoint(hit.point) < 0) { isHidden = true; break; }
-                }
-                if (isHidden) continue;
+          const hit = intersects[i];
+          if (isClipped) {
+            let isHidden = false;
+            for (const plane of clipPlanes) {
+              if (plane.distanceToPoint(hit.point) < 0) {
+                isHidden = true;
+                break;
+              }
             }
-            foundObj = hit.object;
-            break; 
+            if (isHidden) continue;
+          }
+          foundObj = hit.object;
+          break;
         }
 
         if (foundObj) {
-            label.style.display = "block";
-            label.textContent = foundObj.userData.name;
-            label.style.left = mousePos.x + 15 + "px";
-            label.style.top  = mousePos.y + 15 + "px";
-            document.body.style.cursor = "pointer";
+          label.style.display = "block";
+          label.textContent = foundObj.userData.name;
+          label.style.left = mousePos.x + 15 + "px";
+          label.style.top = mousePos.y + 15 + "px";
+          document.body.style.cursor = "pointer";
         } else {
-            label.style.display = "none";
-            document.body.style.cursor = "default";
+          label.style.display = "none";
+          document.body.style.cursor = "default";
         }
-    }
+      }
 
-    window.addEventListener("resize", ()=>{
+      window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+      });
 
-// === FUNGSI MEMBUAT TEKSTUR BINTANG (GLOW) ===
-    function getStarTexture() {
-        const canvas = document.createElement('canvas');
+      function getStarTexture() {
+        const canvas = document.createElement("canvas");
         canvas.width = 32;
         canvas.height = 32;
-        
-        const ctx = canvas.getContext('2d');
-        
+
+        const ctx = canvas.getContext("2d");
+
         const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');          
+        gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+        gradient.addColorStop(0.2, "rgba(255, 255, 255, 0.8)");
+        gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.2)");
+        gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
 
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 32, 32);
 
         const texture = new THREE.CanvasTexture(canvas);
         return texture;
-    }
+      }
 
-    function createStars() {
+      function createStars() {
         const starGeometry = new THREE.BufferGeometry();
-        const starCount = 3000; 
-        const posArray = new Float32Array(starCount * 3); 
+        const starCount = 3000;
+        const posArray = new Float32Array(starCount * 3);
 
-        for(let i = 0; i < starCount * 3; i++) {
-            posArray[i] = (Math.random() - 0.5) * 100; 
+        for (let i = 0; i < starCount * 3; i++) {
+          posArray[i] = (Math.random() - 0.5) * 100;
         }
 
-        starGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        starGeometry.setAttribute(
+          "position",
+          new THREE.BufferAttribute(posArray, 3)
+        );
 
         const starMaterial = new THREE.PointsMaterial({
-            size: 0.5,
-            map: getStarTexture(),
-            transparent: true,
-            opacity: 0.9,
-            color: 0xffffff,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false
+          size: 0.5,
+          map: getStarTexture(),
+          transparent: true,
+          opacity: 0.9,
+          color: 0xffffff,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
         });
 
         const stars = new THREE.Points(starGeometry, starMaterial);
         scene.add(stars);
-        return stars; 
-    }
+        return stars;
+      }
 
-    const starField = createStars();
-    
-    function animate(){
+      const starField = createStars();
+
+      // === ANIMASI FENOMENA GEOLOGI ===
+
+      // 1. GELOMBANG SEISMIK
+      function createSeismicWave() {
+        const geometry = new THREE.RingGeometry(3.3, 3.4, 64);
+        const material = new THREE.MeshBasicMaterial({
+          color: 0x00ffff,
+          transparent: true,
+          opacity: 0.8,
+          side: THREE.DoubleSide,
+        });
+        const wave = new THREE.Mesh(geometry, material);
+        wave.userData.scale = 1;
+        wave.userData.maxScale = 1.5;
+
+        wave.rotation.x = Math.random() * Math.PI;
+        wave.rotation.y = Math.random() * Math.PI;
+
+        scene.add(wave);
+        seismicWaves.push(wave);
+        return wave;
+      }
+
+      function updateSeismicWaves() {
+        if (!activeAnimations.seismic) return;
+
+        seismicWaves.forEach((wave, index) => {
+          wave.userData.scale += 0.01;
+          wave.scale.set(
+            wave.userData.scale,
+            wave.userData.scale,
+            wave.userData.scale
+          );
+          wave.material.opacity =
+            1 - (wave.userData.scale - 1) / (wave.userData.maxScale - 1);
+
+          if (wave.userData.scale >= wave.userData.maxScale) {
+            scene.remove(wave);
+            wave.geometry.dispose();
+            wave.material.dispose();
+            seismicWaves.splice(index, 1);
+          }
+        });
+      }
+
+      // 2. ARUS KONVEKSI
+      function createConvectionFlow() {
+        const particleCount = 500;
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const velocities = [];
+
+        for (let i = 0; i < particleCount; i++) {
+          const radius = 2.2 + Math.random() * 0.8;
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.random() * Math.PI;
+
+          positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+          positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+          positions[i * 3 + 2] = radius * Math.cos(phi);
+
+          velocities.push({
+            theta: theta,
+            phi: phi,
+            speed: 0.002 + Math.random() * 0.003,
+            direction: Math.random() > 0.5 ? 1 : -1,
+          });
+        }
+
+        geometry.setAttribute(
+          "position",
+          new THREE.BufferAttribute(positions, 3)
+        );
+
+        const material = new THREE.PointsMaterial({
+          color: 0xff6600,
+          size: 0.05,
+          transparent: true,
+          opacity: 0.7,
+          blending: THREE.AdditiveBlending,
+        });
+
+        const particles = new THREE.Points(geometry, material);
+        particles.userData.velocities = velocities;
+        scene.add(particles);
+
+        return particles;
+      }
+
+      function updateConvectionFlow() {
+        if (!convectionParticles || !activeAnimations.convection) return;
+
+        const positions =
+          convectionParticles.geometry.attributes.position.array;
+        const velocities = convectionParticles.userData.velocities;
+
+        for (let i = 0; i < positions.length / 3; i++) {
+          const vel = velocities[i];
+          vel.phi += vel.speed * vel.direction;
+
+          if (vel.phi > Math.PI || vel.phi < 0) {
+            vel.direction *= -1;
+          }
+
+          const radius = 2.2 + Math.random() * 0.8;
+          positions[i * 3] = radius * Math.sin(vel.phi) * Math.cos(vel.theta);
+          positions[i * 3 + 1] =
+            radius * Math.sin(vel.phi) * Math.sin(vel.theta);
+          positions[i * 3 + 2] = radius * Math.cos(vel.phi);
+        }
+
+        convectionParticles.geometry.attributes.position.needsUpdate = true;
+      }
+
+      // 3. MEDAN MAGNET
+      function createMagneticField() {
+        const group = new THREE.Group();
+
+        for (let i = 0; i < 6; i++) {
+          const radius = 2.2 + i * 0.15;
+          const tube = 0.02;
+          const geometry = new THREE.TorusGeometry(radius, tube, 16, 100);
+          const material = new THREE.MeshBasicMaterial({
+            color: 0x0088ff,
+            transparent: true,
+            opacity: 0.4,
+            wireframe: false,
+          });
+          const torus = new THREE.Mesh(geometry, material);
+          torus.rotation.x = Math.PI / 2;
+          group.add(torus);
+        }
+
+        scene.add(group);
+        return group;
+      }
+
+      function updateMagneticField() {
+        if (!magneticField || !activeAnimations.magnetic) return;
+
+        magneticField.rotation.y += 0.005;
+
+        magneticField.children.forEach((torus, index) => {
+          const pulse = Math.sin(Date.now() * 0.002 + index) * 0.3 + 0.5;
+          torus.material.opacity = pulse * 0.4;
+        });
+      }
+
+      // KONTROL ANIMASI
+      function startSeismicAnimation() {
+        activeAnimations.seismic = true;
+        document.getElementById("btn-seismic").classList.add("active");
+
+        seismicInterval = setInterval(() => {
+          if (activeAnimations.seismic) {
+            createSeismicWave();
+          }
+        }, 1000);
+      }
+
+      function stopSeismicAnimation() {
+        activeAnimations.seismic = false;
+        document.getElementById("btn-seismic").classList.remove("active");
+
+        if (seismicInterval) {
+          clearInterval(seismicInterval);
+        }
+
+        seismicWaves.forEach((wave) => {
+          scene.remove(wave);
+          wave.geometry.dispose();
+          wave.material.dispose();
+        });
+        seismicWaves = [];
+      }
+
+      function startConvectionAnimation() {
+        if (convectionParticles) return;
+
+        activeAnimations.convection = true;
+        document.getElementById("btn-convection").classList.add("active");
+        convectionParticles = createConvectionFlow();
+      }
+
+      function stopConvectionAnimation() {
+        activeAnimations.convection = false;
+        document.getElementById("btn-convection").classList.remove("active");
+
+        if (convectionParticles) {
+          scene.remove(convectionParticles);
+          convectionParticles.geometry.dispose();
+          convectionParticles.material.dispose();
+          convectionParticles = null;
+        }
+      }
+
+      function startMagneticAnimation() {
+        if (magneticField) return;
+
+        activeAnimations.magnetic = true;
+        document.getElementById("btn-magnetic").classList.add("active");
+        magneticField = createMagneticField();
+      }
+
+      function stopMagneticAnimation() {
+        activeAnimations.magnetic = false;
+        document.getElementById("btn-magnetic").classList.remove("active");
+
+        if (magneticField) {
+          magneticField.children.forEach((child) => {
+            child.geometry.dispose();
+            child.material.dispose();
+          });
+          scene.remove(magneticField);
+          magneticField = null;
+        }
+      }
+
+      function stopAllAnimations() {
+        stopSeismicAnimation();
+        stopConvectionAnimation();
+        stopMagneticAnimation();
+      }
+
+      let seismicInterval = null;
+
+      // === EFEK GLOW & PANAS ===
+
+      function createInnerCoreGlow() {
+        const geometry = new THREE.SphereGeometry(1.4, 32, 32);
+        const material = new THREE.ShaderMaterial({
+          uniforms: {
+            time: { value: 0 },
+            glowColor: { value: new THREE.Color(0xffdd77) },
+          },
+          vertexShader: `
+                varying vec3 vNormal;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+          fragmentShader: `
+                uniform float time;
+                uniform vec3 glowColor;
+                varying vec3 vNormal;
+                void main() {
+                    float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+                    float pulse = sin(time * 2.0) * 0.2 + 0.8;
+                    gl_FragColor = vec4(glowColor, 1.0) * intensity * pulse;
+                }
+            `,
+          side: THREE.BackSide,
+          blending: THREE.AdditiveBlending,
+          transparent: true,
+        });
+
+        const glow = new THREE.Mesh(geometry, material);
+        scene.add(glow);
+        return glow;
+      }
+
+      function createOuterCoreGlow() {
+        const geometry = new THREE.SphereGeometry(2.3, 32, 32);
+        const material = new THREE.ShaderMaterial({
+          uniforms: {
+            time: { value: 0 },
+            glowColor: { value: new THREE.Color(0xff9900) },
+          },
+          vertexShader: `
+                varying vec3 vNormal;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+          fragmentShader: `
+                uniform float time;
+                uniform vec3 glowColor;
+                varying vec3 vNormal;
+                void main() {
+                    float intensity = pow(0.6 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+                    float pulse = sin(time * 1.5) * 0.15 + 0.85;
+                    gl_FragColor = vec4(glowColor, 1.0) * intensity * pulse;
+                }
+            `,
+          side: THREE.BackSide,
+          blending: THREE.AdditiveBlending,
+          transparent: true,
+        });
+
+        const glow = new THREE.Mesh(geometry, material);
+        scene.add(glow);
+        return glow;
+      }
+
+      function createMantleHeatWaves() {
+        const particleCount = 300;
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount; i++) {
+          const radius = 2.5 + Math.random() * 0.4;
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.random() * Math.PI;
+
+          positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+          positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+          positions[i * 3 + 2] = radius * Math.cos(phi);
+
+          const heatLevel = Math.random();
+          colors[i * 3] = 1.0;
+          colors[i * 3 + 1] = 0.3 + heatLevel * 0.4;
+          colors[i * 3 + 2] = 0.0;
+        }
+
+        geometry.setAttribute(
+          "position",
+          new THREE.BufferAttribute(positions, 3)
+        );
+        geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+        const material = new THREE.PointsMaterial({
+          size: 0.1,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.6,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+
+        const heatWaves = new THREE.Points(geometry, material);
+        heatWaves.userData.time = 0;
+        scene.add(heatWaves);
+
+        return heatWaves;
+      }
+
+      function updateInnerCoreGlow() {
+        if (!innerCoreGlow || !activeGlowEffects.innerGlow) return;
+        innerCoreGlow.material.uniforms.time.value = Date.now() * 0.001;
+      }
+
+      function updateOuterCoreGlow() {
+        if (!outerCoreGlow || !activeGlowEffects.outerGlow) return;
+        outerCoreGlow.material.uniforms.time.value = Date.now() * 0.001;
+      }
+
+      function updateMantleHeatWaves() {
+        if (!mantleHeatWaves || !activeGlowEffects.mantleHeat) return;
+
+        mantleHeatWaves.userData.time += 0.01;
+        const positions = mantleHeatWaves.geometry.attributes.position.array;
+
+        for (let i = 0; i < positions.length / 3; i++) {
+          const offset =
+            Math.sin(mantleHeatWaves.userData.time + i * 0.1) * 0.02;
+          const radius = Math.sqrt(
+            positions[i * 3] * positions[i * 3] +
+              positions[i * 3 + 1] * positions[i * 3 + 1] +
+              positions[i * 3 + 2] * positions[i * 3 + 2]
+          );
+
+          const newRadius = radius + offset;
+          const factor = newRadius / radius;
+
+          positions[i * 3] *= factor;
+          positions[i * 3 + 1] *= factor;
+          positions[i * 3 + 2] *= factor;
+        }
+
+        mantleHeatWaves.geometry.attributes.position.needsUpdate = true;
+      }
+
+      function toggleInnerGlow() {
+        if (!innerCoreGlow) innerCoreGlow = createInnerCoreGlow();
+
+        activeGlowEffects.innerGlow = !activeGlowEffects.innerGlow;
+        innerCoreGlow.visible = activeGlowEffects.innerGlow;
+
+        document.getElementById("btn-inner-glow").classList.toggle("active");
+      }
+
+      function toggleOuterGlow() {
+        if (!outerCoreGlow) outerCoreGlow = createOuterCoreGlow();
+
+        activeGlowEffects.outerGlow = !activeGlowEffects.outerGlow;
+        outerCoreGlow.visible = activeGlowEffects.outerGlow;
+
+        document.getElementById("btn-outer-glow").classList.toggle("active");
+      }
+
+      function toggleMantleHeat() {
+        if (!mantleHeatWaves) mantleHeatWaves = createMantleHeatWaves();
+
+        activeGlowEffects.mantleHeat = !activeGlowEffects.mantleHeat;
+        mantleHeatWaves.visible = activeGlowEffects.mantleHeat;
+
+        document.getElementById("btn-mantle-heat").classList.toggle("active");
+      }
+
+      function enableAllGlowEffects() {
+        if (!activeGlowEffects.innerGlow) toggleInnerGlow();
+        if (!activeGlowEffects.outerGlow) toggleOuterGlow();
+        if (!activeGlowEffects.mantleHeat) toggleMantleHeat();
+      }
+
+      function disableAllGlowEffects() {
+        if (activeGlowEffects.innerGlow) toggleInnerGlow();
+        if (activeGlowEffects.outerGlow) toggleOuterGlow();
+        if (activeGlowEffects.mantleHeat) toggleMantleHeat();
+      }
+
+      // === MODE SIANG/MALAM ===
+
+      function createCityLights() {
+        const particleCount = 1500;
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+
+        // Hitung arah matahari (normalized)
+        const sunDirection = new THREE.Vector3(
+          sunLight.position.x,
+          sunLight.position.y,
+          sunLight.position.z
+        ).normalize();
+
+        let validCount = 0;
+
+        // Generate particles hanya di sisi yang berlawanan dengan matahari (malam)
+        while (validCount < particleCount) {
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+          const radius = 3.31;
+
+          // Posisi partikel
+          const x = radius * Math.sin(phi) * Math.cos(theta);
+          const y = radius * Math.sin(phi) * Math.sin(theta);
+          const z = radius * Math.cos(phi);
+
+          // Vector dari pusat ke partikel
+          const particleDirection = new THREE.Vector3(x, y, z).normalize();
+
+          // Dot product: jika negatif, berarti berlawanan dengan matahari (sisi malam)
+          const dotProduct = particleDirection.dot(sunDirection);
+
+          // Hanya ambil partikel di sisi malam (dot < -0.1 untuk zona transisi)
+          if (dotProduct < -0.1) {
+            positions[validCount * 3] = x;
+            positions[validCount * 3 + 1] = y;
+            positions[validCount * 3 + 2] = z;
+
+            // Variasi warna lampu kota
+            const brightness = 0.8 + Math.random() * 0.2;
+            colors[validCount * 3] = brightness; // R
+            colors[validCount * 3 + 1] = brightness * 0.9; // G
+            colors[validCount * 3 + 2] = brightness * 0.3; // B
+
+            validCount++;
+          }
+        }
+
+        geometry.setAttribute(
+          "position",
+          new THREE.BufferAttribute(positions, 3)
+        );
+        geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+        const material = new THREE.PointsMaterial({
+          size: 0.04,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          sizeAttenuation: true,
+        });
+
+        const lights = new THREE.Points(geometry, material);
+        scene.add(lights);
+
+        return lights;
+      }
+
+      function createNightShade() {
+        // Hemisphere yang gelap untuk sisi malam SAJA (setengah bola belakang)
+        const geometry = new THREE.SphereGeometry(
+          3.31, // Radius sedikit lebih besar dari crust
+          64, // widthSegments
+          64, // heightSegments
+          0, // phiStart - mulai dari 0
+          Math.PI // phiLength - hanya setengah lingkaran (180 derajat)
+        );
+
+        const material = new THREE.MeshBasicMaterial({
+          color: 0x000000,
+          transparent: true,
+          opacity: 0,
+          side: THREE.BackSide, // Hanya sisi dalam yang terlihat
+          depthWrite: false,
+        });
+
+        const shade = new THREE.Mesh(geometry, material);
+        scene.add(shade);
+
+        return shade;
+      }
+
+      function createTerminatorLine() {
+        // Garis pemisah antara siang dan malam (twilight zone)
+        const points = [];
+        const segments = 128; // Banyak titik untuk smooth
+
+        // Buat lingkaran vertikal (meridian) di tengah-tengah bumi
+        for (let i = 0; i <= segments; i++) {
+          const phi = (i / segments) * Math.PI * 2; // 0 to 2π
+          const radius = 3.32; // Sedikit lebih besar dari crust
+
+          const x = 0; // Lingkaran di plane YZ
+          const y = radius * Math.cos(phi);
+          const z = radius * Math.sin(phi);
+
+          points.push(new THREE.Vector3(x, y, z));
+        }
+
+        const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+
+        // Gradient shader untuk garis yang smooth (lebih terang di tengah)
+        const lineMaterial = new THREE.LineBasicMaterial({
+          color: 0xffaa00, // Orange/golden color (seperti sunset)
+          transparent: true,
+          opacity: 0,
+          linewidth: 2,
+        });
+
+        const line = new THREE.Line(lineGeometry, lineMaterial);
+        scene.add(line);
+
+        return line;
+      }
+
+      function createTwilightGlow() {
+        // Efek glow di sekitar terminator line (zona twilight)
+        const geometry = new THREE.TorusGeometry(
+          3.32, // radius
+          0.08, // tube thickness
+          16, // radialSegments
+          128 // tubularSegments
+        );
+
+        const material = new THREE.MeshBasicMaterial({
+          color: 0xff8800,
+          transparent: true,
+          opacity: 0,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+        });
+
+        const glow = new THREE.Mesh(geometry, material);
+        glow.rotation.y = Math.PI / 2; // Rotasi agar vertikal
+        scene.add(glow);
+
+        return glow;
+      }
+
+      function toggleDayNightMode() {
+        isDayMode = !isDayMode;
+        const btn = document.getElementById("toggle-daynight");
+
+        if (!nightShade) nightShade = createNightShade();
+        if (!terminatorLine) terminatorLine = createTerminatorLine();
+        if (!twilightGlow) twilightGlow = createTwilightGlow();
+
+        if (isDayMode) {
+          // MODE SIANG - Seluruh bumi terang (normal)
+          btn.textContent = "☀️ Mode Siang";
+          btn.classList.remove("active");
+
+          // Aktifkan rotasi bumi kembali
+          isRotating = true;
+
+          // Sembunyikan lampu kota dan bayangan malam
+          if (cityLights) {
+            animateOpacity(cityLights.material, 0, 500);
+            setTimeout(() => {
+              if (cityLights) {
+                scene.remove(cityLights);
+                cityLights.geometry.dispose();
+                cityLights.material.dispose();
+                cityLights = null;
+              }
+            }, 500);
+          }
+          animateOpacity(nightShade.material, 0, 500);
+          if (terminatorLine) animateOpacity(terminatorLine.material, 0, 500);
+          if (twilightGlow) animateOpacity(twilightGlow.material, 0, 500);
+
+          // Cahaya matahari normal
+          sunLight.intensity = 1.2;
+          scene.children.forEach((child) => {
+            if (child instanceof THREE.AmbientLight) {
+              child.intensity = 0.6;
+            }
+          });
+        } else {
+          // MODE MALAM - Menampilkan siang-malam realistis
+          btn.textContent = "🌙 Mode Malam";
+          btn.classList.add("active");
+
+          // STOP rotasi bumi agar lampu tetap di posisi malam
+          isRotating = false;
+
+          // Generate ulang city lights sesuai posisi matahari saat ini
+          if (cityLights) {
+            scene.remove(cityLights);
+            cityLights.geometry.dispose();
+            cityLights.material.dispose();
+          }
+          cityLights = createCityLights();
+
+          // Sisi SIANG tetap terang (cahaya matahari normal)
+          // Sisi MALAM gelap dengan lampu kota redup
+
+          // Tampilkan bayangan malam (gelap = 1.0)
+          animateOpacity(nightShade.material, 1.0, 500); // Gelap total
+
+          // Tampilkan lampu kota (kecerahan 0.25 - seperempat dari siang)
+          animateOpacity(cityLights.material, 0.25, 500); // 25% cahaya
+
+          // Tampilkan terminator line dan twilight glow
+          animateOpacity(terminatorLine.material, 0.6, 500); // Garis oranye
+          animateOpacity(twilightGlow.material, 0.3, 500); // Glow lembut
+
+          // Rotasi nightShade menghadap arah berlawanan dari matahari (update awal)
+          const sunDir = new THREE.Vector3(
+            sunLight.position.x,
+            sunLight.position.y,
+            sunLight.position.z
+          ).normalize();
+          nightShade.rotation.y = Math.atan2(sunDir.x, sunDir.z) + Math.PI;
+          terminatorLine.rotation.y = Math.atan2(sunDir.x, sunDir.z) + Math.PI;
+          twilightGlow.rotation.z = Math.atan2(sunDir.x, sunDir.z) + Math.PI;
+
+          // Cahaya matahari tetap normal (untuk sisi siang)
+          sunLight.intensity = 1.2;
+          scene.children.forEach((child) => {
+            if (child instanceof THREE.AmbientLight) {
+              child.intensity = 0.6;
+            }
+          });
+        }
+      }
+
+      function animateOpacity(material, targetOpacity, duration) {
+        const startOpacity = material.opacity;
+        const startTime = Date.now();
+
+        function update() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+
+          material.opacity =
+            startOpacity + (targetOpacity - startOpacity) * progress;
+
+          if (progress < 1) {
+            requestAnimationFrame(update);
+          }
+        }
+
+        update();
+      }
+
+      function updateNightShade() {
+        if (!nightShade || isDayMode) return;
+
+        // Selalu hadapkan hemisphere gelap berlawanan dengan matahari
+        // Rotasi agar sisi terbuka menghadap matahari, sisi tertutup membelakangi
+        const sunDir = new THREE.Vector3(
+          sunLight.position.x,
+          sunLight.position.y,
+          sunLight.position.z
+        ).normalize();
+
+        // Hitung rotasi Y (horizontal)
+        nightShade.rotation.y = Math.atan2(sunDir.x, sunDir.z) + Math.PI;
+      }
+
+      function updateCityLights() {
+        if (!cityLights || isDayMode) return;
+
+        // Efek twinkle (kedip-kedip) untuk city lights - subtle
+        const colors = cityLights.geometry.attributes.color.array;
+        const time = Date.now() * 0.001;
+
+        for (let i = 0; i < colors.length / 3; i++) {
+          // Random twinkle per lampu (variasi kecil karena hanya 25% cahaya)
+          const twinkle = Math.sin(time * 1.5 + i * 0.05) * 0.1 + 0.9;
+          const baseR = 1.0;
+          const baseG = 0.85;
+          const baseB = 0.4;
+
+          colors[i * 3] = baseR * twinkle;
+          colors[i * 3 + 1] = baseG * twinkle;
+          colors[i * 3 + 2] = baseB * twinkle;
+        }
+
+        cityLights.geometry.attributes.color.needsUpdate = true;
+      }
+
+      // Event listeners
+      document.getElementById("btn-seismic").onclick = () => {
+        if (activeAnimations.seismic) {
+          stopSeismicAnimation();
+        } else {
+          startSeismicAnimation();
+        }
+      };
+
+      document.getElementById("btn-convection").onclick = () => {
+        if (activeAnimations.convection) {
+          stopConvectionAnimation();
+        } else {
+          startConvectionAnimation();
+        }
+      };
+
+      document.getElementById("btn-magnetic").onclick = () => {
+        if (activeAnimations.magnetic) {
+          stopMagneticAnimation();
+        } else {
+          startMagneticAnimation();
+        }
+      };
+
+      document.getElementById("btn-stop-all").onclick = () => {
+        stopAllAnimations();
+      };
+
+      // Day/Night Mode
+      document.getElementById("toggle-daynight").onclick = toggleDayNightMode;
+
+      // === GLOW PANEL LOGIC ===
+      const glowPanel = document.getElementById("glow-panel");
+      const btnToggleGlow = document.getElementById("toggle-glow");
+      const btnCloseGlow = document.getElementById("close-glow");
+
+      btnToggleGlow.onclick = () => {
+        const isVisible = glowPanel.classList.contains("show");
+
+        if (isVisible) {
+          glowPanel.classList.remove("show");
+          btnToggleGlow.classList.remove("active");
+        } else {
+          glowPanel.classList.add("show");
+          btnToggleGlow.classList.add("active");
+        }
+      };
+
+      btnCloseGlow.onclick = () => {
+        glowPanel.classList.remove("show");
+        btnToggleGlow.classList.remove("active");
+      };
+
+      document.getElementById("btn-inner-glow").onclick = toggleInnerGlow;
+      document.getElementById("btn-outer-glow").onclick = toggleOuterGlow;
+      document.getElementById("btn-mantle-heat").onclick = toggleMantleHeat;
+      document.getElementById("btn-all-glow").onclick = enableAllGlowEffects;
+      document.getElementById("btn-stop-glow").onclick = disableAllGlowEffects;
+
+      // === TIMELINE GEOLOGI LOGIC ===
+      const timelinePanel = document.getElementById("timeline-panel");
+      const btnToggleTimeline = document.getElementById("toggle-timeline");
+      const btnCloseTimeline = document.getElementById("close-timeline");
+      const timelineSlider = document.getElementById("timeline-slider");
+
+      function updateTimelineDisplay(index) {
+        const era = geologicalTimeline[index];
+
+        document.getElementById("timeline-era").textContent = era.era;
+        document.getElementById("timeline-age").textContent = era.age;
+        document.getElementById("timeline-description").textContent =
+          era.description;
+        document.getElementById("timeline-temp").textContent = era.temp;
+        document.getElementById("timeline-oxygen").textContent = era.oxygen;
+        document.getElementById("timeline-volcanic").textContent = era.volcanic;
+
+        // Update visual bumi sesuai era
+        updateEarthVisuals(era);
+      }
+
+      let eraEffects = [];
+
+      // ========================================
+      // FUNGSI UTAMA UPDATE EARTH VISUALS
+      // ========================================
+      function updateEarthVisuals(era) {
+        const transitionDuration = 1000; // 1 detik transisi
+
+        // Animasi warna kerak bumi dengan transisi smooth
+        crust.children.forEach((mesh) => {
+          const startColor = mesh.material.color.getHex();
+          const endColor = era.crustColor;
+
+          animateColorTransition(
+            mesh.material,
+            startColor,
+            endColor,
+            transitionDuration
+          );
+
+          // Update emissive untuk efek panas (era purba lebih panas)
+          animateEmissiveTransition(
+            mesh.material,
+            era.mantleEmissive * 0.3,
+            transitionDuration
+          );
+        });
+
+        // Animasi mantle dengan intensitas emissive
+        mantle.children.forEach((mesh) => {
+          animateEmissiveTransition(
+            mesh.material,
+            era.mantleEmissive,
+            transitionDuration
+          );
+
+          // Tambahkan efek transparansi untuk era purba (lebih cair)
+          if (era.index <= 2) {
+            // Era Hadean & Archean - mantel lebih cair
+            mesh.material.transparent = true;
+            animateOpacityTransition(mesh.material, 0.85, transitionDuration);
+          } else {
+            animateOpacityTransition(mesh.material, 1.0, transitionDuration);
+          }
+        });
+
+        // Animasi inner core
+        inner.children.forEach((mesh) => {
+          animateEmissiveTransition(
+            mesh.material,
+            era.innerEmissive,
+            transitionDuration
+          );
+
+          // Era purba: inner core lebih bercahaya
+          if (era.index <= 1) {
+            const targetColor = new THREE.Color(0xffff00); // Kuning terang
+            animateEmissiveColorTransition(
+              mesh.material,
+              targetColor,
+              transitionDuration
+            );
+          } else {
+            const targetColor = new THREE.Color(0xffdd77); // Normal
+            animateEmissiveColorTransition(
+              mesh.material,
+              targetColor,
+              transitionDuration
+            );
+          }
+        });
+
+        // Animasi outer core
+        outer.children.forEach((mesh) => {
+          const outerIntensity = era.mantleEmissive * 0.7;
+          animateEmissiveTransition(
+            mesh.material,
+            outerIntensity,
+            transitionDuration
+          );
+
+          // Era purba: outer core lebih aktif
+          if (era.index <= 2) {
+            mesh.material.transparent = true;
+            animateOpacityTransition(mesh.material, 0.7, transitionDuration);
+          } else {
+            animateOpacityTransition(mesh.material, 0.85, transitionDuration);
+          }
+        });
+
+        // Adjust lighting sesuai era
+        updateLightingForEra(era);
+
+        // Tambahkan efek khusus untuk era tertentu
+        addSpecialEraEffects(era);
+      }
+
+      // ========================================
+      // FUNGSI HELPER UNTUK ANIMASI
+      // ========================================
+
+      // Fungsi helper untuk animasi transisi warna
+      function animateColorTransition(
+        material,
+        startColorHex,
+        endColorHex,
+        duration
+      ) {
+        const startColor = new THREE.Color(startColorHex);
+        const endColor = new THREE.Color(endColorHex);
+        const startTime = Date.now();
+
+        function update() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+
+          // Smooth interpolation dengan easing (ease-in-out)
+          const eased =
+            progress < 0.5
+              ? 2 * progress * progress
+              : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+          material.color.r = startColor.r + (endColor.r - startColor.r) * eased;
+          material.color.g = startColor.g + (endColor.g - startColor.g) * eased;
+          material.color.b = startColor.b + (endColor.b - startColor.b) * eased;
+
+          material.needsUpdate = true;
+
+          if (progress < 1) {
+            requestAnimationFrame(update);
+          }
+        }
+
+        update();
+      }
+
+      // Fungsi helper untuk animasi emissive color
+      function animateEmissiveColorTransition(material, targetColor, duration) {
+        const startColor = material.emissive.clone();
+        const startTime = Date.now();
+
+        function update() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+
+          const eased =
+            progress < 0.5
+              ? 2 * progress * progress
+              : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+          material.emissive.r =
+            startColor.r + (targetColor.r - startColor.r) * eased;
+          material.emissive.g =
+            startColor.g + (targetColor.g - startColor.g) * eased;
+          material.emissive.b =
+            startColor.b + (targetColor.b - startColor.b) * eased;
+
+          material.needsUpdate = true;
+
+          if (progress < 1) {
+            requestAnimationFrame(update);
+          }
+        }
+
+        update();
+      }
+
+      // Fungsi helper untuk animasi emissive intensity
+      function animateEmissiveTransition(material, targetIntensity, duration) {
+        const startIntensity = material.emissiveIntensity;
+        const startTime = Date.now();
+
+        function update() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+
+          const eased =
+            progress < 0.5
+              ? 2 * progress * progress
+              : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+          material.emissiveIntensity =
+            startIntensity + (targetIntensity - startIntensity) * eased;
+          material.needsUpdate = true;
+
+          if (progress < 1) {
+            requestAnimationFrame(update);
+          }
+        }
+
+        update();
+      }
+
+      // Fungsi helper untuk animasi opacity
+      function animateOpacityTransition(material, targetOpacity, duration) {
+        const startOpacity = material.opacity;
+        const startTime = Date.now();
+
+        function update() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+
+          const eased =
+            progress < 0.5
+              ? 2 * progress * progress
+              : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+          material.opacity =
+            startOpacity + (targetOpacity - startOpacity) * eased;
+          material.needsUpdate = true;
+
+          if (progress < 1) {
+            requestAnimationFrame(update);
+          }
+        }
+
+        update();
+      }
+
+      // ========================================
+      // UPDATE PENCAHAYAAN SESUAI ERA
+      // ========================================
+
+      function updateLightingForEra(era) {
+        const duration = 1000;
+
+        // Era purba: cahaya lebih redup karena atmosfer berbeda
+        if (era.index <= 2) {
+          // Hadean & Archean - atmosfer tebal, cahaya redup
+          animateLightIntensity(sunLight, 0.8, duration);
+          scene.children.forEach((child) => {
+            if (child instanceof THREE.AmbientLight) {
+              animateLightIntensity(child, 0.3, duration);
+              animateLightColor(child, new THREE.Color(0xff8844), duration); // Warna kemerahan
+            }
+          });
+        } else if (era.index <= 4) {
+          // Proterozoic - Snowball Earth
+          animateLightIntensity(sunLight, 1.0, duration);
+          scene.children.forEach((child) => {
+            if (child instanceof THREE.AmbientLight) {
+              animateLightIntensity(child, 0.5, duration);
+              animateLightColor(child, new THREE.Color(0xaaccff), duration); // Warna kebiruan (dingin)
+            }
+          });
+        } else {
+          // Era modern - normal
+          animateLightIntensity(sunLight, 1.2, duration);
+          scene.children.forEach((child) => {
+            if (child instanceof THREE.AmbientLight) {
+              animateLightIntensity(child, 0.6, duration);
+              animateLightColor(child, new THREE.Color(0xffffff), duration); // Putih normal
+            }
+          });
+        }
+      }
+
+      function animateLightIntensity(light, targetIntensity, duration) {
+        const startIntensity = light.intensity;
+        const startTime = Date.now();
+
+        function update() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+
+          const eased =
+            progress < 0.5
+              ? 2 * progress * progress
+              : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+          light.intensity =
+            startIntensity + (targetIntensity - startIntensity) * eased;
+
+          if (progress < 1) {
+            requestAnimationFrame(update);
+          }
+        }
+
+        update();
+      }
+
+      function animateLightColor(light, targetColor, duration) {
+        const startColor = light.color.clone();
+        const startTime = Date.now();
+
+        function update() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+
+          const eased =
+            progress < 0.5
+              ? 2 * progress * progress
+              : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+          light.color.r = startColor.r + (targetColor.r - startColor.r) * eased;
+          light.color.g = startColor.g + (targetColor.g - startColor.g) * eased;
+          light.color.b = startColor.b + (targetColor.b - startColor.b) * eased;
+
+          if (progress < 1) {
+            requestAnimationFrame(update);
+          }
+        }
+
+        update();
+      }
+
+      // ========================================
+      // EFEK KHUSUS UNTUK ERA TERTENTU
+      // ========================================
+
+      function addSpecialEraEffects(era) {
+        // Bersihkan efek sebelumnya dengan animasi fade out
+        eraEffects.forEach((effect) => {
+          if (effect.material && effect.material.transparent) {
+            animateOpacityTransition(effect.material, 0, 500);
+            setTimeout(() => {
+              scene.remove(effect);
+              if (effect.geometry) effect.geometry.dispose();
+              if (effect.material) {
+                if (effect.material.map) effect.material.map.dispose();
+                effect.material.dispose();
+              }
+            }, 500);
+          } else {
+            scene.remove(effect);
+            if (effect.geometry) effect.geometry.dispose();
+            if (effect.material) {
+              if (effect.material.map) effect.material.map.dispose();
+              effect.material.dispose();
+            }
+          }
+        });
+        eraEffects = [];
+
+        // Efek untuk Snowball Earth (era index 4)
+        if (era.index === 4) {
+          // Tambahkan lapisan es dengan efek kristal
+          const iceGeometry = new THREE.SphereGeometry(3.32, 64, 64);
+          const iceMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0xccddff,
+            transparent: true,
+            opacity: 0,
+            metalness: 0.1,
+            roughness: 0.2,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.1,
+            side: THREE.FrontSide,
+          });
+          const iceSphere = new THREE.Mesh(iceGeometry, iceMaterial);
+          scene.add(iceSphere);
+          eraEffects.push(iceSphere);
+
+          // Fade in
+          animateOpacityTransition(iceMaterial, 0.6, 1000);
+        }
+
+        // Efek untuk asteroid impact (era index 7 - Kepunahan Dinosaurus)
+        if (era.index === 7) {
+          // Tambahkan efek ledakan/debu
+          const dustGeometry = new THREE.SphereGeometry(3.4, 64, 64);
+          const dustMaterial = new THREE.MeshBasicMaterial({
+            color: 0x664422,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide,
+          });
+          const dustCloud = new THREE.Mesh(dustGeometry, dustMaterial);
+          scene.add(dustCloud);
+          eraEffects.push(dustCloud);
+
+          // Fade in
+          animateOpacityTransition(dustMaterial, 0.4, 1000);
+
+          // Animasi rotasi debu
+          dustCloud.userData.rotationSpeed = 0.002;
+        }
+
+        // Efek lava untuk era purba (index 0-1)
+        if (era.index <= 1) {
+          // Tambahkan efek glow lava di permukaan
+          const lavaGlow = new THREE.SphereGeometry(3.35, 32, 32);
+          const lavaMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff4400,
+            transparent: true,
+            opacity: 0,
+            side: THREE.BackSide,
+            blending: THREE.AdditiveBlending,
+          });
+          const lavaEffect = new THREE.Mesh(lavaGlow, lavaMaterial);
+          scene.add(lavaEffect);
+          eraEffects.push(lavaEffect);
+
+          // Fade in
+          animateOpacityTransition(lavaMaterial, 0.3, 1000);
+
+          // Animasi pulsasi
+          lavaEffect.userData.pulseTime = 0;
+        }
+
+        // Efek vegetasi untuk Paleozoic (index 5)
+        if (era.index === 5) {
+          // Tambahkan warna hijau di permukaan (vegetasi)
+          const vegGeometry = new THREE.SphereGeometry(3.305, 64, 64);
+          const vegMaterial = new THREE.MeshLambertMaterial({
+            color: 0x447733,
+            transparent: true,
+            opacity: 0,
+            side: THREE.FrontSide,
+          });
+          const vegetation = new THREE.Mesh(vegGeometry, vegMaterial);
+          scene.add(vegetation);
+          eraEffects.push(vegetation);
+
+          // Fade in
+          animateOpacityTransition(vegMaterial, 0.3, 1000);
+        }
+      }
+
+      // ========================================
+      // UPDATE ANIMASI EFEK ERA DI LOOP ANIMATE
+      // ========================================
+
+      function updateEraEffects() {
+        eraEffects.forEach((effect) => {
+          // Animasi debu berputar (asteroid impact)
+          if (effect.userData.rotationSpeed) {
+            effect.rotation.y += effect.userData.rotationSpeed;
+            effect.rotation.x += effect.userData.rotationSpeed * 0.5;
+          }
+
+          // Animasi pulsasi lava
+          if (effect.userData.pulseTime !== undefined) {
+            effect.userData.pulseTime += 0.02;
+            const pulse = Math.sin(effect.userData.pulseTime) * 0.1 + 0.9;
+            effect.scale.set(pulse, pulse, pulse);
+          }
+        });
+      }
+
+      btnToggleTimeline.onclick = () => {
+        const isVisible = timelinePanel.classList.contains("show");
+
+        if (isVisible) {
+          timelinePanel.classList.remove("show");
+          btnToggleTimeline.classList.remove("active");
+        } else {
+          timelinePanel.classList.add("show");
+          btnToggleTimeline.classList.add("active");
+
+          // Update display ke era terakhir (modern)
+          updateTimelineDisplay(8);
+        }
+      };
+
+      btnCloseTimeline.onclick = () => {
+        timelinePanel.classList.remove("show");
+        btnToggleTimeline.classList.remove("active");
+      };
+
+      timelineSlider.addEventListener("input", (e) => {
+        const index = parseInt(e.target.value);
+        updateTimelineDisplay(index);
+      });
+
+      // === ANIMATION LOOP (INI YANG PALING PENTING!) ===
+      function animate() {
         requestAnimationFrame(animate);
-        const speed = 0.0015; 
-        layers.forEach(l => l.rotation.y += speed);
-        starField.rotation.y -= 0.0002; 
+
+        // Rotasi bumi jika dalam mode siang atau rotasi aktif
+        if (isRotating) {
+          layers.forEach((layer) => {
+            layer.rotation.y += 0.001;
+          });
+        }
+
+        // Update animasi fenomena
+        updateSeismicWaves();
+        updateConvectionFlow();
+        updateMagneticField();
+
+        // Update efek glow
+        updateInnerCoreGlow();
+        updateOuterCoreGlow();
+        updateMantleHeatWaves();
+
+        // Update mode siang/malam
+        updateNightShade();
+        updateCityLights();
+
+        // Update efek era geologi
+        updateEraEffects();
+
+        // Update hover detection
+        checkHover();
 
         controls.update();
-        checkHover();
         renderer.render(scene, camera);
-    }
+      }
 
-    animate();
+      const quizQuestions = [
+        {
+          question:
+            "Lapisan terluar Bumi yang menjadi tempat kita tinggal disebut?",
+          options: ["Kerak Bumi (Crust)", "Mantel", "Inti Luar", "Inti Dalam"],
+          correct: 0,
+          explanation:
+            "Kerak Bumi adalah lapisan terluar dengan ketebalan 5-70 km. Di sini kita hidup!",
+        },
+        {
+          question: "Berapa ketebalan rata-rata Kerak Bumi di bawah benua?",
+          options: ["5-10 km", "15-20 km", "30-70 km", "100-200 km"],
+          correct: 2,
+          explanation:
+            "Kerak benua memiliki ketebalan 30-70 km, jauh lebih tebal dari kerak samudra (5-10 km).",
+        },
+        {
+          question: "Lapisan manakah yang paling tebal di Bumi?",
+          options: ["Kerak Bumi", "Mantel", "Inti Luar", "Inti Dalam"],
+          correct: 1,
+          explanation:
+            "Mantel adalah lapisan terbesar dengan ketebalan sekitar 2.865 km, hampir 84% volume Bumi!",
+        },
+        {
+          question: "Suhu di Inti Dalam Bumi mencapai berapa derajat Celsius?",
+          options: ["1.000°C", "3.000°C", "5.400°C", "10.000°C"],
+          correct: 2,
+          explanation:
+            "Inti Dalam mencapai suhu 5.400°C - sepanas permukaan Matahari!",
+        },
+        {
+          question:
+            "Apa yang membuat Inti Dalam tetap padat meskipun sangat panas?",
+          options: [
+            "Suhu yang rendah",
+            "Tekanan ekstrem",
+            "Tidak ada gravitasi",
+            "Komposisi khusus",
+          ],
+          correct: 1,
+          explanation:
+            "Tekanan ekstrem (330-360 GPa) memaksa besi-nikel tetap padat meski suhunya sangat tinggi.",
+        },
+        {
+          question:
+            "Fenomena alam apa yang dihasilkan oleh gerakan fluida di Inti Luar?",
+          options: [
+            "Gempa bumi",
+            "Medan magnet Bumi",
+            "Gunung berapi",
+            "Tsunami",
+          ],
+          correct: 1,
+          explanation:
+            "Gerakan besi-nikel cair di Inti Luar menciptakan efek dinamo yang menghasilkan medan magnet Bumi!",
+        },
+        {
+          question: "Apa komponen utama penyusun Mantel Bumi?",
+          options: [
+            "Besi dan Nikel",
+            "Silikat (batuan)",
+            "Air dan Gas",
+            "Karbon",
+          ],
+          correct: 1,
+          explanation:
+            "Mantel terdiri dari batuan silikat semi-padat seperti olivin dan peridotit.",
+        },
+        {
+          question: "Proses apa di Mantel yang menggerakkan lempeng tektonik?",
+          options: [
+            "Gempa bumi",
+            "Arus konveksi",
+            "Rotasi Bumi",
+            "Gravitasi Bulan",
+          ],
+          correct: 1,
+          explanation:
+            "Arus konveksi panas di Mantel menggerakkan lempeng tektonik di atasnya.",
+        },
+        {
+          question: "Inti Luar Bumi berada dalam fase apa?",
+          options: ["Padat", "Cair", "Gas", "Plasma"],
+          correct: 1,
+          explanation:
+            "Inti Luar adalah lapisan logam cair (besi-nikel) dengan ketebalan 2.400 km.",
+        },
+        {
+          question: "Berapa persentase besi dalam komposisi Inti Dalam?",
+          options: ["50%", "65%", "85%", "100%"],
+          correct: 2,
+          explanation:
+            "Inti Dalam terdiri dari 85% besi dan 10% nikel, sisanya elemen lain dalam bentuk kristal padat.",
+        },
+      ];
+
+      let currentQuizIndex = 0;
+      let quizScore = 0;
+      let selectedAnswer = null;
+      let quizAnswered = false;
+
+      const quizPanel = document.getElementById("quiz-panel");
+      const btnToggleQuiz = document.getElementById("toggle-quiz");
+      const btnCloseQuiz = document.getElementById("close-quiz");
+
+      function shuffleArray(array) {
+        const newArray = [...array];
+        for (let i = newArray.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+        }
+        return newArray;
+      }
+
+      let shuffledQuestions = [];
+
+      function initQuiz() {
+        currentQuizIndex = 0;
+        quizScore = 0;
+        selectedAnswer = null;
+        quizAnswered = false;
+
+        // Acak urutan soal
+        shuffledQuestions = shuffleArray(quizQuestions);
+
+        document.getElementById("quiz-content").style.display = "block";
+        document.getElementById("quiz-complete").classList.remove("show");
+        document.getElementById("quiz-score").textContent = "0";
+        document.getElementById("quiz-total").textContent =
+          shuffledQuestions.length;
+
+        loadQuestion();
+      }
+
+      function loadQuestion() {
+        if (currentQuizIndex >= shuffledQuestions.length) {
+          showQuizComplete();
+          return;
+        }
+
+        quizAnswered = false;
+        selectedAnswer = null;
+
+        const question = shuffledQuestions[currentQuizIndex];
+
+        document.getElementById("quiz-question").textContent =
+          question.question;
+        document.getElementById("quiz-progress").textContent = `Soal ${
+          currentQuizIndex + 1
+        } dari ${shuffledQuestions.length}`;
+
+        // Generate options
+        const optionsContainer = document.getElementById("quiz-options");
+        optionsContainer.innerHTML = "";
+
+        question.options.forEach((option, index) => {
+          const optionDiv = document.createElement("div");
+          optionDiv.className = "quiz-option";
+          optionDiv.textContent = option;
+          optionDiv.dataset.index = index;
+
+          optionDiv.onclick = () => selectOption(index, optionDiv);
+
+          optionsContainer.appendChild(optionDiv);
+        });
+
+        // Reset feedback dan tombol
+        document.getElementById("quiz-feedback").classList.remove("show");
+        document
+          .getElementById("quiz-feedback")
+          .classList.remove("correct", "wrong");
+        document.getElementById("quiz-check").style.display = "none";
+        document.getElementById("quiz-next").style.display = "none";
+      }
+
+      function selectOption(index, element) {
+        if (quizAnswered) return;
+
+        // Hapus selection sebelumnya
+        document.querySelectorAll(".quiz-option").forEach((opt) => {
+          opt.classList.remove("selected");
+        });
+
+        // Pilih option baru
+        element.classList.add("selected");
+        selectedAnswer = index;
+
+        // Tampilkan tombol cek
+        document.getElementById("quiz-check").style.display = "inline-block";
+      }
+
+      function checkAnswer() {
+        if (selectedAnswer === null || quizAnswered) return;
+
+        quizAnswered = true;
+        const question = shuffledQuestions[currentQuizIndex];
+        const isCorrect = selectedAnswer === question.correct;
+
+        // Update skor
+        if (isCorrect) {
+          quizScore++;
+          document.getElementById("quiz-score").textContent = quizScore;
+        }
+
+        // Tampilkan feedback visual pada options
+        const options = document.querySelectorAll(".quiz-option");
+        options.forEach((opt, index) => {
+          opt.classList.add("disabled");
+
+          if (index === question.correct) {
+            opt.classList.add("correct");
+          } else if (index === selectedAnswer && !isCorrect) {
+            opt.classList.add("wrong");
+          }
+        });
+
+        // Tampilkan feedback text
+        const feedback = document.getElementById("quiz-feedback");
+        feedback.textContent = question.explanation;
+        feedback.classList.add("show");
+        feedback.classList.add(isCorrect ? "correct" : "wrong");
+
+        // Ubah tombol
+        document.getElementById("quiz-check").style.display = "none";
+        document.getElementById("quiz-next").style.display = "inline-block";
+      }
+
+      function nextQuestion() {
+        currentQuizIndex++;
+        loadQuestion();
+      }
+
+      function showQuizComplete() {
+        document.getElementById("quiz-content").style.display = "none";
+
+        const completeSection = document.getElementById("quiz-complete");
+        completeSection.classList.add("show");
+
+        const percentage = (quizScore / shuffledQuestions.length) * 100;
+        document.getElementById(
+          "final-score"
+        ).textContent = `${quizScore}/${shuffledQuestions.length}`;
+
+        let message = "";
+        if (percentage === 100) {
+          message = "🏆 Sempurna! Kamu adalah ahli geologi sejati!";
+        } else if (percentage >= 80) {
+          message = "⭐ Hebat! Kamu sangat memahami struktur Bumi!";
+        } else if (percentage >= 60) {
+          message = "👍 Bagus! Terus belajar untuk hasil lebih baik!";
+        } else if (percentage >= 40) {
+          message = "📚 Lumayan! Coba pelajari lagi materinya ya!";
+        } else {
+          message =
+            "💪 Jangan menyerah! Ulangi quiz untuk belajar lebih dalam!";
+        }
+
+        document.getElementById("final-message").textContent = message;
+      }
+
+      // Event Listeners untuk Quiz
+      if (btnToggleQuiz) {
+        btnToggleQuiz.onclick = () => {
+          const isVisible = quizPanel.classList.contains("show");
+
+          if (isVisible) {
+            quizPanel.classList.remove("show");
+            btnToggleQuiz.classList.remove("active");
+          } else {
+            quizPanel.classList.add("show");
+            btnToggleQuiz.classList.add("active");
+            initQuiz();
+          }
+        };
+      }
+
+      if (btnCloseQuiz) {
+        btnCloseQuiz.onclick = () => {
+          quizPanel.classList.remove("show");
+          if (btnToggleQuiz) btnToggleQuiz.classList.remove("active");
+        };
+      }
+
+      document.getElementById("quiz-check").onclick = checkAnswer;
+      document.getElementById("quiz-next").onclick = nextQuestion;
+
+      document.getElementById("quiz-restart").onclick = () => {
+        initQuiz();
+      };
+
+      document.getElementById("quiz-close").onclick = () => {
+        quizPanel.classList.remove("show");
+        if (btnToggleQuiz) btnToggleQuiz.classList.remove("active");
+      };
+
+      // MULAI ANIMASI
+      animate();
     </script>
-    </body>
+  </body>
 </html>
